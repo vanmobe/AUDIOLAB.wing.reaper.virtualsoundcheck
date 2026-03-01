@@ -141,12 +141,27 @@ bool ReaperExtension::Initialize(reaper_plugin_info_t* rec) {
         fprintf(stderr, "🔧 [WING] Configuration loaded successfully\n");
         fflush(stderr);
         Log("Wing Connector: Configuration loaded\n");
+        
+        bool config_updated = false;
+        
         // Migrate legacy default listen port (2224 -> 2223)
         if (config_.listen_port == 2224) {
             config_.listen_port = 2223;
-            if (config_.SaveToFile(config_path)) {
-                Log("Wing Connector: Updated listener port to 2223\n");
-            }
+            config_updated = true;
+            Log("Wing Connector: Updated listener port to 2223\n");
+        }
+        
+        // Auto-enable MIDI actions if not configured
+        if (!config_.configure_midi_actions) {
+            config_.configure_midi_actions = true;
+            config_updated = true;
+            Log("Wing Connector: Auto-enabled MIDI action mapping for Wing buttons\n");
+        }
+        
+        // Save updated config
+        if (config_updated && config_.SaveToFile(config_path)) {
+            fprintf(stderr, "🔧 [WING] Configuration auto-updated and saved\n");
+            fflush(stderr);
         }
     }
     
