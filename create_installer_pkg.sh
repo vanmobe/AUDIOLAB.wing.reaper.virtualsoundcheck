@@ -20,6 +20,7 @@ PKG_IDENTIFIER="com.colab.reaper.wingconnector"
 
 # Directories
 BUILD_DIR="build"
+RELEASES_DIR="releases"
 PKG_ROOT="pkg_root"
 PKG_SCRIPTS="pkg_scripts"
 INSTALL_TARGET="/Library/Application Support/REAPER/UserPlugins"
@@ -44,8 +45,12 @@ if ! command -v pkgbuild &> /dev/null; then
     exit 1
 fi
 
+# Create releases directory
+mkdir -p "$RELEASES_DIR"
+
 # Clean up old package files
-rm -rf "$PKG_ROOT" "$PKG_SCRIPTS" "$PKG_NAME"
+rm -rf "$PKG_ROOT" "$PKG_SCRIPTS"
+rm -f "$RELEASES_DIR/$PKG_NAME"
 
 # Create package root structure
 echo ""
@@ -90,7 +95,7 @@ pkgbuild \
     --identifier "$PKG_IDENTIFIER" \
     --version "$VERSION" \
     --install-location "/" \
-    "$PKG_NAME"
+    "$RELEASES_DIR/$PKG_NAME"
 
 # Clean up temporary files
 rm -rf "$PKG_ROOT" "$PKG_SCRIPTS"
@@ -101,11 +106,11 @@ echo -e "${GREEN}=========================================${NC}"
 echo -e "${GREEN}  Package Created Successfully!${NC}"
 echo -e "${GREEN}=========================================${NC}"
 echo ""
-echo "Installer package: $PKG_NAME"
-echo "Size: $(du -h "$PKG_NAME" | cut -f1)"
+echo "Installer package: $RELEASES_DIR/$PKG_NAME"
+echo "Size: $(du -h "$RELEASES_DIR/$PKG_NAME" | cut -f1)"
 echo ""
 echo "To install:"
-echo "  Double-click $PKG_NAME"
+echo "  Double-click $RELEASES_DIR/$PKG_NAME"
 echo ""
 echo "Or distribute this file to users for easy installation."
 echo ""

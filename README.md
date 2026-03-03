@@ -1,8 +1,10 @@
 # Wing Connector - Reaper Extension for Behringer Wing
 
-A professional C++ Reaper extension that connects to a Behringer Wing console via UDP/OSC to automatically set up recording tracks based on the Wing's channel configuration.
+A C++ Reaper extension that connects to a Behringer Wing console via UDP/OSC to automatically set up recording tracks based on the Wing's channel configuration.
 
-**Status:** ✅ Production Ready | **Version:** 1.0.0 | **License:** MIT
+**Status:** ✅ Production Ready | **Version:** 1.0.0 | **License:** MIT | **Platform:** macOS only (for now)
+
+**📖 [Visual User Guide](docs/USER_GUIDE.md)** — Complete step-by-step guide with screenshots
 
 ---
 
@@ -29,14 +31,19 @@ A professional C++ Reaper extension that connects to a Behringer Wing console vi
 
 Wing Connector bridges your Behringer Wing console and Reaper DAW, automating track setup and synchronization. Instead of manually creating tracks that match your Wing's channel configuration, simply connect and let Wing Connector handle it—creating tracks with proper names, colors, routing, and stereo pairing all automatically.
 
+**New to Wing Connector?** Check out the **[Visual User Guide](docs/USER_GUIDE.md)** with screenshots and step-by-step instructions for every feature.
+
 ### What It Does
 
 - **Queries your Wing console** via OSC (Open Sound Control) to discover all channels
 - **Automatically creates matching Reaper tracks** with correct names and configurations
 - **Syncs channel colors** from Wing to Reaper tracks for visual consistency
-- **Optionally groups stereo channels** into paired tracks
+- **Groups stereo channels** into paired tracks
 - **Monitors real-time changes** on the Wing and updates tracks accordingly
+- **Configures routing** to output the recording channels over USB/CARD and receive the inputs from Reaper for a virtual soundcheck
+- **Sets ALT channels** to switch between live/virtual soundcheck
 - **Loads automatically** with Reaper—no manual plugin activation needed
+- **Configures Reaper shortcuts** to easily trigger actions in Reaper from your Behringer Wing
 
 ### Perfect For
 
@@ -58,7 +65,8 @@ Wing Connector bridges your Behringer Wing console and Reaper DAW, automating tr
 - ✅ **Channel-Accurate Colors** — Reaper tracks inherit Wing's color palette
 - ✅ **Stereo Channel Pairing** — Optional automatic grouping of stereo channel pairs
 - ✅ **Complete Channel Metadata** — Captures names, colors, icons, and routing information
-- ✅ **Cross-Platform** — Works on macOS, Windows, and Linux
+- ✅ **Wing Button Control** — Control REAPER actions directly from Wing custom buttons (MIDI)
+- ✅ **macOS Support** — Currently available for macOS only (Windows and Linux support planned)
 
 ### Available Actions
 
@@ -67,14 +75,19 @@ All actions are accessible via **Extensions → Wing Connector** menu:
 | Action | Purpose | Keyboard Shortcut |
 |--------|---------|-------------------|
 | **Connect to Behringer Wing** | Initial connection, query Wing, create tracks | Ctrl+Shift+W (customizable) |
-| **Refresh Tracks** | Re-query Wing, update existing tracks | (customizable) |
-| **Toggle Monitoring** | Enable/disable real-time track synchronization | (customizable) |
-
 ---
 
 ## Quick Start (5 Minutes)
 
-Getting up and running with Wing Connector is straightforward:
+Getting up and running with Wing Connector is straightforward. Choose one of two installation methods:
+
+**Option A: Install from Package (Easiest)**
+- Download the installer: [WingConnector-1.0.0.pkg](releases/WingConnector-1.0.0.pkg)
+- Double-click to install
+- Skip to step 1 below
+
+**Option B: Build from Source**
+- Follow all steps below to build and install manually
 
 ### 1. Prepare Your Wing Console
 
@@ -86,9 +99,16 @@ On your Behringer Wing:
 5. Verify **OSC Port** is `2223` (or note the actual port)
 6. For the midi commands to work make sure 'External MIDI Control' is set to **USB**
 
-### 2. Set Up Dependencies
+**Optional - Configure Wing Buttons for REAPER Control:**
 
-#### macOS / Linux
+You can set up your Wing's custom buttons to control Wing Connector actions:
+- **Quick:** Download pre-configured snap file from [snapshots/](snapshots/) *(coming soon)*
+- **Manual:** Follow detailed setup guide in [snapshots/README.md](snapshots/README.md)
+- **Result:** Trigger Connect, Refresh, Record, Play directly from Wing buttons!
+
+### 2. Set Up Dependencies (Build from Source Only)
+
+**macOS:**
 ```bash
 ./setup_dependencies.sh
 ```
@@ -99,8 +119,7 @@ Then manually download the Reaper SDK:
 - Create directory: `mkdir -p lib/reaper-sdk`
 - Copy downloaded files to `lib/reaper-sdk/`
 
-#### Windows
-Download and set up manually (see [Dependencies Setup](#dependencies-setup) section)
+**Note:** If using the `.pkg` installer, dependencies are already included—skip this step.
 
 ### 3. Update Configuration
 
@@ -116,22 +135,19 @@ Edit `config.json` with your Wing's IP address:
 }
 ```
 
-### 4. Build the Extension
+### 4. Build the Extension (Build from Source Only)
 
-#### macOS / Linux
+**macOS:**
 ```bash
 chmod +x build.sh
 ./build.sh
 ```
 
-#### Windows
-```cmd
-build.bat
-```
-
 Build usually takes 1-2 minutes. Watch for `BUILD SUCCESS` message.
 
-### 5. Install to Reaper
+**Note:** If using the `.pkg` installer, the plugin is built and installed automatically—skip this step.
+
+### 5. Install to Reaper (Build from Source Only)
 
 After successful build, copy files to Reaper's UserPlugins folder:
 
@@ -142,19 +158,12 @@ cp install/reaper_wingconnector.dylib ~/Library/Application\ Support/REAPER/User
 cp config.json ~/Library/Application\ Support/REAPER/UserPlugins/
 ```
 
-**Windows:**
-```cmd
-mkdir %APPDATA%\REAPER\UserPlugins
-copy install\reaper_wingconnector.dll %APPDATA%\REAPER\UserPlugins\
-copy config.json %APPDATA%\REAPER\UserPlugins\
+**Alternative:** Use the automated installer script:
+```bash
+./install_macos.sh
 ```
 
-**Linux:**
-```bash
-mkdir -p ~/.config/REAPER/UserPlugins
-cp install/reaper_wingconnector.so ~/.config/REAPER/UserPlugins/
-cp config.json ~/.config/REAPER/UserPlugins/
-```
+This script will build (if needed) and install automatically.
 
 ### 6. Restart Reaper and Connect
 
@@ -170,28 +179,25 @@ cp config.json ~/.config/REAPER/UserPlugins/
 
 ### Runtime Requirements
 
+- **macOS** — Version 10.13 (High Sierra) or later (Windows and Linux support coming soon)
 - **Reaper DAW** — Version 6.0 or later
 - **Behringer Wing Console** — Compact, Rack, or Full model
 - **Network Connection** — Computer and Wing on same network (wired or WiFi)
 
-### Build Requirements
+### Build Requirements (For Building from Source)
 
 **CMake:**
 - Version 3.15 or later
 - macOS: `brew install cmake`
-- Windows: Download from https://cmake.org/download/
-- Linux: `sudo apt install cmake` (Ubuntu/Debian)
 
 **C++ Compiler:**
 - macOS: Xcode Command Line Tools (`xcode-select --install`)
-- Windows: Visual Studio 2019, 2022, or MinGW with C++17 support
-- Linux: GCC 8+ or Clang 7+ with C++17 support
 
 **Git:**
 - Required for downloading oscpack library
-- macOS: Included with Xcode
-- Windows: Download from https://git-scm.com/download/win
-- Linux: `sudo apt install git` or `sudo yum install git`
+- macOS: Included with Xcode or install via `brew install git`
+
+**Note:** These are only required if building from source. The `.pkg` installer includes all necessary components.
 
 ### Third-Party Dependencies
 
@@ -530,6 +536,43 @@ To create custom shortcuts for any Wing action:
 6. **Confirm** with Enter
 
 Now your shortcut triggers that action!
+
+### Controlling REAPER from Wing Buttons
+
+Take your workflow to the next level by triggering Wing Connector actions directly from your Behringer Wing console!
+
+**Why use Wing buttons?**
+- Keep hands on the console while controlling REAPER
+- Faster workflow during live recording sessions
+- No need to switch between Wing and computer
+- Trigger recording, playback, and Wing sync without leaving the console
+
+**Setup Options:**
+
+**Option 1: Use Pre-configured Snap File (Coming Soon)**
+1. Download [wing-control-buttons.snap](snapshots/) *(will be uploaded)*
+2. Import to REAPER: `Actions → Show action list → Import/export → Import`
+3. Done! Buttons are configured automatically
+
+**Option 2: Manual Configuration (Available Now)**
+
+Full step-by-step guide: **[snapshots/README.md](snapshots/README.md)**
+
+Quick overview:
+1. Configure Wing custom buttons to send MIDI commands (USB)
+2. Enable REAPER to receive MIDI from Wing
+3. Map MIDI notes to Wing Connector actions
+4. Press Wing buttons to trigger actions!
+
+**Suggested Button Layout:**
+- Custom Button 1 → **Connect to Wing** (initial setup)
+- Custom Button 2 → **Refresh Tracks** (update after changes)
+- Custom Button 3 → **Toggle Monitoring** (real-time sync)
+- Custom Button 4 → **Record** (start/stop recording)
+- Custom Button 5 → **Play/Stop** (playback control)
+- Custom Button 6 → **Play/Pause** (pause/resume)
+
+See [snapshots/README.md](snapshots/README.md) for detailed MIDI configuration instructions.
 
 ### Typical Workflow
 
@@ -1042,8 +1085,18 @@ Comprehensive documentation covers both usage and development:
 
 ### User & Operator Documentation
 
+- **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)** - **📸 Complete visual guide with screenshots** covering:
+  - Installation verification
+  - Wing console configuration (OSC & MIDI)
+  - Understanding every dialog option
+  - Virtual soundcheck setup and usage (USB vs CARD, ALT channels)
+  - MIDI button control configuration
+  - Complete workflow examples
+  - Troubleshooting with visual aids
 - **[README.md](README.md)** - This file; quick start and user guide
 - **[QUICKSTART.md](QUICKSTART.md)** - 5-minute getting started guide
+- **[INSTALL.md](INSTALL.md)** - Installation guide for package and source builds
+- **[snapshots/README.md](snapshots/README.md)** - Wing button MIDI control setup
 - **[docs/WING_OSC_PROTOCOL.md](docs/WING_OSC_PROTOCOL.md)** - OSC protocol reference based on Patrick Gillot's manual
 
 ### Architecture & Development Documentation

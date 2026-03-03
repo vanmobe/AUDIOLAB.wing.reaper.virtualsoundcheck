@@ -17,6 +17,8 @@ pkg_scripts/
 
 # Installer packages
 *.pkg
+# But allow packages in releases folder
+!releases/*.pkg
 
 # Python (backup)
 __pycache__/
