@@ -14,6 +14,12 @@ if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/reaper-sdk/reaper_plugin.h" OR
         "Required: reaper_plugin.h and reaper_plugin_functions.h")
 endif()
 
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/oscpack/osc/OscOutboundPacketStream.h")
+    message(FATAL_ERROR
+        "Missing oscpack sources in lib/oscpack/. "
+        "Clone https://github.com/RossBencina/oscpack.git into lib/oscpack")
+endif()
+
 # Enable Objective-C for macOS settings dialog
 if(APPLE)
     enable_language(OBJC)

@@ -29,6 +29,14 @@ jobs:
           grep -q "REAPER_PLUGIN_ENTRYPOINT" "lib/reaper-sdk/reaper_plugin.h"
           grep -q "REAPERAPI_LoadAPI" "lib/reaper-sdk/reaper_plugin_functions.h"
 
+      - name: Fetch oscpack sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf lib/oscpack
+          git clone --depth 1 https://github.com/RossBencina/oscpack.git lib/oscpack
+          test -f "lib/oscpack/osc/OscOutboundPacketStream.h"
+
       - name: Configure (CMake)
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
