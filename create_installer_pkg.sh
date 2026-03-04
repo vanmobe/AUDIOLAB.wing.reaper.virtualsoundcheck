@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Create macOS .pkg installer for COLAB.wing.reaper.virtualsoundcheck
+# Create macOS .pkg installer for AUDIOLAB.wing.reaper.virtualsoundcheck
 # This script creates a distributable installer package
 
 set -e
@@ -15,8 +15,8 @@ NC='\033[0m'
 VERSION="1.0.0"
 PLUGIN_NAME="reaper_wingconnector.dylib"
 CONFIG_FILE="config.json"
-PKG_NAME="COLAB-wing-reaper-virtualsoundcheck-${VERSION}.pkg"
-PKG_IDENTIFIER="com.colab.wing.reaper.virtualsoundcheck"
+PKG_NAME="AUDIOLAB-Virtual-Soundcheck-v${VERSION}-macOS.pkg"
+PKG_IDENTIFIER="com.audiolab.wing.reaper.virtualsoundcheck"
 
 # Directories
 BUILD_DIR="build"
@@ -26,7 +26,7 @@ PKG_SCRIPTS="pkg_scripts"
 INSTALL_TARGET="/Library/Application Support/REAPER/UserPlugins"
 
 echo -e "${BLUE}=========================================${NC}"
-echo -e "${BLUE}  COLAB.wing.reaper.virtualsoundcheck .pkg Installer Builder${NC}"
+echo -e "${BLUE}  AUDIOLAB.wing.reaper.virtualsoundcheck .pkg Installer Builder${NC}"
 echo -e "${BLUE}=========================================${NC}"
 echo ""
 
@@ -79,7 +79,7 @@ if [ -d "$HOME/Library/Application Support/REAPER" ]; then
     # Set permissions
     chmod 755 "$USER_PLUGINS_DIR/reaper_wingconnector.dylib"
     
-    echo "COLAB.wing.reaper.virtualsoundcheck installed to: $USER_PLUGINS_DIR"
+    echo "AUDIOLAB.wing.reaper.virtualsoundcheck installed to: $USER_PLUGINS_DIR"
 fi
 
 exit 0

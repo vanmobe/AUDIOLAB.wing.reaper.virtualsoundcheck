@@ -7,7 +7,7 @@ OUT_DIR="${3:-releases}"
 
 PLUGIN_NAME="reaper_wingconnector.so"
 CONFIG_NAME="config.json"
-PACKAGE_NAME="colab-wing-reaper-virtualsoundcheck"
+PACKAGE_NAME="audiolab-virtual-soundcheck"
 ARCH="${ARCH_OVERRIDE:-$(dpkg --print-architecture)}"
 
 if [[ ! -f "$STAGE_DIR/$PLUGIN_NAME" ]]; then
@@ -35,15 +35,15 @@ Section: sound
 Priority: optional
 Architecture: ${ARCH}
 Maintainer: CO LAB <noreply@example.com>
-Description: COLAB.wing.reaper.virtualsoundcheck REAPER extension for Behringer Wing
- Installs the REAPER COLAB.wing.reaper.virtualsoundcheck plugin and config file.
+Description: AUDIOLAB Virtual Soundcheck for REAPER and Behringer WING
+ Installs the REAPER AUDIOLAB Virtual Soundcheck plugin and config file.
 EOF
 
 cat > "$PKG_DIR/DEBIAN/postinst" << 'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
-SOURCE_DIR="/usr/share/colab-wing-reaper-virtualsoundcheck"
+SOURCE_DIR="/usr/share/audiolab-virtual-soundcheck"
 for home_dir in /home/*; do
   [[ -d "$home_dir" ]] || continue
   user_name="$(basename "$home_dir")"
@@ -79,7 +79,7 @@ exit 0
 EOF
 chmod 755 "$PKG_DIR/DEBIAN/postrm"
 
-OUT_FILE="$OUT_DIR/colab-wing-reaper-virtualsoundcheck_${VERSION}_${ARCH}.deb"
+OUT_FILE="$OUT_DIR/AUDIOLAB-Virtual-Soundcheck-v${VERSION}-${ARCH}.deb"
 dpkg-deb --build "$PKG_DIR" "$OUT_FILE" >/dev/null
 rm -rf "$TMP_ROOT"
 

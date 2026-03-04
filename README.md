@@ -1,6 +1,6 @@
-# COLAB.wing.reaper.virtualsoundcheck (REAPER Extension for Behringer WING)
+# AUDIOLAB.wing.reaper.virtualsoundcheck (REAPER Extension for Behringer WING)
 
-COLAB.wing.reaper.virtualsoundcheck is a C++ REAPER extension that connects to a Behringer WING console over OSC/UDP and automates track setup, channel sync, and virtual soundcheck routing.
+AUDIOLAB.wing.reaper.virtualsoundcheck is a C++ REAPER extension that connects to a Behringer WING console over OSC/UDP and automates track setup, channel sync, and virtual soundcheck routing.
 
 - Status: Production-ready
 - Platforms: macOS, Windows, Linux
@@ -29,9 +29,9 @@ Platform-specific steps are in [INSTALL.md](INSTALL.md).
 
 ## Quick Start
 
-1. Install COLAB.wing.reaper.virtualsoundcheck for your platform.
+1. Install AUDIOLAB.wing.reaper.virtualsoundcheck for your platform.
 2. Restart REAPER.
-3. Open `Extensions -> COLAB.wing.reaper.virtualsoundcheck -> Connect to Behringer Wing`.
+3. Open `Extensions -> AUDIOLAB.wing.reaper.virtualsoundcheck -> Connect to Behringer Wing`.
 4. Enter your WING IP and port (default `2223`) and fetch channels.
 5. Confirm tracks are created/updated in REAPER.
 

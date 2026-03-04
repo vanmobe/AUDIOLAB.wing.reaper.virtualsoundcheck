@@ -1,6 +1,6 @@
 # WING Button to REAPER MIDI Mapping
 
-This guide explains how to map Behringer WING custom controls to REAPER actions used with COLAB.wing.reaper.virtualsoundcheck.
+This guide explains how to map Behringer WING custom controls to REAPER actions used with AUDIOLAB.wing.reaper.virtualsoundcheck.
 
 ## Scope
 

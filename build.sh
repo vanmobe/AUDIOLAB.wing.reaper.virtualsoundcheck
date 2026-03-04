@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Build script for COLAB.wing.reaper.virtualsoundcheck Reaper Extension
+# Build script for AUDIOLAB.wing.reaper.virtualsoundcheck Reaper Extension
 # Supports macOS, Linux, and Windows (via WSL/MinGW)
 
 set -e
 
 echo "========================================="
-echo "COLAB.wing.reaper.virtualsoundcheck - Build Script"
+echo "AUDIOLAB.wing.reaper.virtualsoundcheck - Build Script"
 echo "========================================="
 echo ""
 

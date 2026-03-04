@@ -137,12 +137,12 @@ bool ReaperExtension::Initialize(reaper_plugin_info_t* rec) {
         if (!config_.LoadFromFile("config.json")) {
             fprintf(stderr, "🔧 [WING] Using default configuration\n");
             fflush(stderr);
-            Log("COLAB.wing.reaper.virtualsoundcheck: Using default configuration\n");
+            Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Using default configuration\n");
         }
     } else {
         fprintf(stderr, "🔧 [WING] Configuration loaded successfully\n");
         fflush(stderr);
-        Log("COLAB.wing.reaper.virtualsoundcheck: Configuration loaded\n");
+        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Configuration loaded\n");
         
         bool config_updated = false;
         
@@ -150,14 +150,14 @@ bool ReaperExtension::Initialize(reaper_plugin_info_t* rec) {
         if (config_.listen_port == 2224) {
             config_.listen_port = 2223;
             config_updated = true;
-            Log("COLAB.wing.reaper.virtualsoundcheck: Updated listener port to 2223\n");
+            Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Updated listener port to 2223\n");
         }
         
         // Auto-enable MIDI actions if not configured
         if (!config_.configure_midi_actions) {
             config_.configure_midi_actions = true;
             config_updated = true;
-            Log("COLAB.wing.reaper.virtualsoundcheck: Auto-enabled MIDI action mapping for Wing buttons\n");
+            Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Auto-enabled MIDI action mapping for Wing buttons\n");
         }
         
         // Save updated config
@@ -204,11 +204,11 @@ void ReaperExtension::Shutdown() {
 // Connects and verifies OSC reachability only; track creation is user-driven.
 bool ReaperExtension::ConnectToWing() {
     if (connected_) {
-        Log("COLAB.wing.reaper.virtualsoundcheck: Already connected\n");
+        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Already connected\n");
         return true;
     }
     
-    Log("COLAB.wing.reaper.virtualsoundcheck: Connecting to Wing...\n");
+    Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Connecting to Wing...\n");
     status_message_ = "Connecting...";
     
     // Wing OSC is fixed to 2223.
@@ -231,7 +231,7 @@ bool ReaperExtension::ConnectToWing() {
     
     // Start OSC server
     if (!osc_handler_->Start()) {
-        Log("COLAB.wing.reaper.virtualsoundcheck: Failed to start OSC server. Port may be in use.\n");
+        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Failed to start OSC server. Port may be in use.\n");
         osc_handler_.reset();
         status_message_ = "Failed to start";
         return false;
@@ -239,14 +239,14 @@ bool ReaperExtension::ConnectToWing() {
     
     // Test connection
     if (!osc_handler_->TestConnection()) {
-        Log("COLAB.wing.reaper.virtualsoundcheck: Could not connect to Wing console. Check IP and OSC settings.\n");
+        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Could not connect to Wing console. Check IP and OSC settings.\n");
         osc_handler_->Stop();
         osc_handler_.reset();
         status_message_ = "Connection failed";
         return false;
     }
     
-    Log("COLAB.wing.reaper.virtualsoundcheck: Connected!\n");
+    Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Connected!\n");
     connected_ = true;
     status_message_ = "Connected";
     
@@ -255,7 +255,7 @@ bool ReaperExtension::ConnectToWing() {
     if (!wing_info.model.empty()) {
         char info_msg[256];
         snprintf(info_msg, sizeof(info_msg),
-                 "COLAB.wing.reaper.virtualsoundcheck: Detected %s (%s) FW %s\n",
+                 "AUDIOLAB.wing.reaper.virtualsoundcheck: Detected %s (%s) FW %s\n",
                  wing_info.model.c_str(),
                  wing_info.name.empty() ? "Unnamed" : wing_info.name.c_str(),
                  wing_info.firmware.empty() ? "unknown" : wing_info.firmware.c_str());
@@ -270,18 +270,18 @@ std::vector<ChannelSelectionInfo> ReaperExtension::GetAvailableChannels() {
     std::vector<ChannelSelectionInfo> result;
     
     if (!connected_ || !osc_handler_) {
-        Log("COLAB.wing.reaper.virtualsoundcheck: Not connected. Cannot query channels.\n");
+        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Not connected. Cannot query channels.\n");
         return result;
     }
     
-    Log("COLAB.wing.reaper.virtualsoundcheck: Querying channels...\n");
+    Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Querying channels...\n");
     
     // Query all channels with retries
     const auto query_delay = std::chrono::milliseconds(kQueryResponseWaitMs);
     for (int attempt = 1; attempt <= kChannelQueryAttempts; ++attempt) {
         char attempt_msg[128];
         snprintf(attempt_msg, sizeof(attempt_msg),
-                 "COLAB.wing.reaper.virtualsoundcheck: Querying channels (attempt %d/%d)\n",
+                 "AUDIOLAB.wing.reaper.virtualsoundcheck: Querying channels (attempt %d/%d)\n",
                  attempt, kChannelQueryAttempts);
         Log(attempt_msg);
         osc_handler_->QueryAllChannels(config_.channel_count);
@@ -290,14 +290,14 @@ std::vector<ChannelSelectionInfo> ReaperExtension::GetAvailableChannels() {
             break;
         }
         if (attempt < kChannelQueryAttempts) {
-            Log("COLAB.wing.reaper.virtualsoundcheck: No channel data yet, retrying...\n");
+            Log("AUDIOLAB.wing.reaper.virtualsoundcheck: No channel data yet, retrying...\n");
         }
     }
     
     // Get channel data
     const auto& channel_data = osc_handler_->GetChannelData();
     if (channel_data.empty()) {
-        Log("COLAB.wing.reaper.virtualsoundcheck: No channel data received. Check timeout settings.\n");
+        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: No channel data received. Check timeout settings.\n");
         return result;
     }
 
@@ -322,7 +322,7 @@ std::vector<ChannelSelectionInfo> ReaperExtension::GetAvailableChannels() {
     }
     osc_handler_->QueryInputSourceNames(source_endpoints);
     
-    Log("COLAB.wing.reaper.virtualsoundcheck: Processing channel data...\n");
+    Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Processing channel data...\n");
     // stereo_linked is set from /io/in/{grp}/{num}/mode by the second pass in QueryAllChannels.
     // No heuristics needed.
     
@@ -371,7 +371,7 @@ std::vector<ChannelSelectionInfo> ReaperExtension::GetAvailableChannels() {
     }
     
     char msg[128];
-    snprintf(msg, sizeof(msg), "COLAB.wing.reaper.virtualsoundcheck: Found %d channels with sources\n", 
+    snprintf(msg, sizeof(msg), "AUDIOLAB.wing.reaper.virtualsoundcheck: Found %d channels with sources\n", 
              (int)result.size());
     Log(msg);
     
@@ -381,11 +381,11 @@ std::vector<ChannelSelectionInfo> ReaperExtension::GetAvailableChannels() {
 // Create tracks from selected channels
 void ReaperExtension::CreateTracksFromSelection(const std::vector<ChannelSelectionInfo>& channels) {
     if (!connected_ || !osc_handler_) {
-        Log("COLAB.wing.reaper.virtualsoundcheck: Not connected\n");
+        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Not connected\n");
         return;
     }
     
-    Log("COLAB.wing.reaper.virtualsoundcheck: Creating tracks from selection...\n");
+    Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Creating tracks from selection...\n");
     
     // Filter to only selected channels
     std::vector<ChannelSelectionInfo> selected;
@@ -396,7 +396,7 @@ void ReaperExtension::CreateTracksFromSelection(const std::vector<ChannelSelecti
     }
     
     if (selected.empty()) {
-        Log("COLAB.wing.reaper.virtualsoundcheck: No channels selected\n");
+        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: No channels selected\n");
         return;
     }
     
@@ -424,7 +424,7 @@ void ReaperExtension::CreateTracksFromSelection(const std::vector<ChannelSelecti
     int track_count = track_manager_->CreateTracksFromChannelData(filtered_data);
     
     char msg[128];
-    snprintf(msg, sizeof(msg), "COLAB.wing.reaper.virtualsoundcheck: Created %d tracks\n", track_count);
+    snprintf(msg, sizeof(msg), "AUDIOLAB.wing.reaper.virtualsoundcheck: Created %d tracks\n", track_count);
     Log(msg);
 }
 
@@ -573,11 +573,11 @@ bool ReaperExtension::ValidateLiveRecordingSetup(std::string& details) {
 // Setup virtual soundcheck from selected channels
 void ReaperExtension::SetupSoundcheckFromSelection(const std::vector<ChannelSelectionInfo>& channels, bool setup_soundcheck) {
     if (!connected_ || !osc_handler_) {
-        Log("COLAB.wing.reaper.virtualsoundcheck: Not connected\n");
+        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Not connected\n");
         return;
     }
     
-    Log("COLAB.wing.reaper.virtualsoundcheck: Setting up Virtual Soundcheck...\n");
+    Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Setting up Virtual Soundcheck...\n");
     
     // Filter to only selected channels
     std::vector<ChannelInfo> selected_channels;
@@ -601,7 +601,7 @@ void ReaperExtension::SetupSoundcheckFromSelection(const std::vector<ChannelSele
     }
     
     if (selected_channels.empty()) {
-        Log("COLAB.wing.reaper.virtualsoundcheck: No channels selected\n");
+        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: No channels selected\n");
         return;
     }
     
@@ -654,7 +654,7 @@ void ReaperExtension::SetupSoundcheckFromSelection(const std::vector<ChannelSele
     const int available_outputs = GetNumAudioOutputs();
     if (available_inputs < required_io_channels || available_outputs < required_io_channels) {
         std::ostringstream err;
-        err << "COLAB.wing.reaper.virtualsoundcheck: REAPER audio device does not expose enough channels for "
+        err << "AUDIOLAB.wing.reaper.virtualsoundcheck: REAPER audio device does not expose enough channels for "
             << output_type << " soundcheck. Required by current selection: "
             << required_io_channels << " in / " << required_io_channels << " out, available: "
             << available_inputs << " in / " << available_outputs << " out.\n";
@@ -666,7 +666,7 @@ void ReaperExtension::SetupSoundcheckFromSelection(const std::vector<ChannelSele
             << "Available now: " << available_inputs << " inputs / "
             << available_outputs << " outputs.\n\n"
             << "Please switch REAPER audio device/range or choose fewer channels.";
-        ShowMessageBox(msg.str().c_str(), "COLAB.wing.reaper.virtualsoundcheck - Audio I/O Not Available", 0);
+        ShowMessageBox(msg.str().c_str(), "AUDIOLAB.wing.reaper.virtualsoundcheck - Audio I/O Not Available", 0);
         return;
     }
     
@@ -757,7 +757,7 @@ void ReaperExtension::SetupSoundcheckFromSelection(const std::vector<ChannelSele
         }
     }
     
-    Undo_EndBlock("COLAB.wing.reaper.virtualsoundcheck: Configure Virtual Soundcheck", UNDO_STATE_TRACKCFG);
+    Undo_EndBlock("AUDIOLAB.wing.reaper.virtualsoundcheck: Configure Virtual Soundcheck", UNDO_STATE_TRACKCFG);
     
     Log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
     Log("✓ CONFIGURATION COMPLETE\n");
@@ -773,7 +773,7 @@ void ReaperExtension::DisconnectFromWing() {
         return;
     }
     
-    Log("COLAB.wing.reaper.virtualsoundcheck: Disconnecting...\n");
+    Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Disconnecting...\n");
     
     if (osc_handler_) {
         osc_handler_->Stop();
@@ -784,7 +784,7 @@ void ReaperExtension::DisconnectFromWing() {
     monitoring_enabled_ = false;
     status_message_ = "Disconnected";
     
-    Log("COLAB.wing.reaper.virtualsoundcheck: Disconnected\n");
+    Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Disconnected\n");
 }
 
 std::vector<WingInfo> ReaperExtension::DiscoverWings(int timeout_ms) {
@@ -796,13 +796,13 @@ void ReaperExtension::RefreshTracks() {
         ShowMessageBox(
             "Not connected to Wing console.\n"
             "Please connect first.",
-            "COLAB.wing.reaper.virtualsoundcheck",
+            "AUDIOLAB.wing.reaper.virtualsoundcheck",
             0
         );
         return;
     }
     
-    Log("COLAB.wing.reaper.virtualsoundcheck: Refreshing tracks...\n");
+    Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Refreshing tracks...\n");
     
     // Re-query channels
     osc_handler_->QueryAllChannels(config_.channel_count);
@@ -833,7 +833,7 @@ void ReaperExtension::ShowSettings() {
         std::string new_ip = ip_buffer;
         if (new_ip.empty() || new_ip.length() > 15) {
             ShowMessageBox("Invalid IP address.\nPlease use format: 192.168.0.1", 
-                          "COLAB.wing.reaper.virtualsoundcheck - Error", 0);
+                          "AUDIOLAB.wing.reaper.virtualsoundcheck - Error", 0);
             return;
         }
         // Update configuration
@@ -852,29 +852,29 @@ void ReaperExtension::ShowSettings() {
                 "Changes will apply on next connection.",
                 config_.wing_ip.c_str());
             
-            ShowMessageBox(success_msg, "COLAB.wing.reaper.virtualsoundcheck - Settings Saved", 0);
-            Log("COLAB.wing.reaper.virtualsoundcheck: Settings updated from dialog\n");
+            ShowMessageBox(success_msg, "AUDIOLAB.wing.reaper.virtualsoundcheck - Settings Saved", 0);
+            Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Settings updated from dialog\n");
         } else {
             char error_msg[512];
             snprintf(error_msg, sizeof(error_msg),
                       "Failed to save settings to:\n%s\n\nPlease check file permissions.",
                       config_path.c_str());
             ShowMessageBox(error_msg,
-                          "COLAB.wing.reaper.virtualsoundcheck - Error", 0);
+                          "AUDIOLAB.wing.reaper.virtualsoundcheck - Error", 0);
         }
     }
     #else
     // Fallback for non-macOS platforms
     char settings_msg[512];
     snprintf(settings_msg, sizeof(settings_msg), 
-        "COLAB.wing.reaper.virtualsoundcheck Settings\n\n"
+        "AUDIOLAB.wing.reaper.virtualsoundcheck Settings\n\n"
         "Current Configuration:\n"
         "  Wing IP: %s\n"
         "  OSC Port: 2223\n"
         "\nEdit config.json to change settings.\n",
         config_.wing_ip.c_str());
     
-    ShowMessageBox(settings_msg, "COLAB.wing.reaper.virtualsoundcheck - Settings", 0);
+    ShowMessageBox(settings_msg, "AUDIOLAB.wing.reaper.virtualsoundcheck - Settings", 0);
     #endif
 }
 
@@ -882,10 +882,10 @@ void ReaperExtension::EnableMonitoring(bool enable) {
     monitoring_enabled_ = enable;
     
     if (enable) {
-        Log("COLAB.wing.reaper.virtualsoundcheck: Real-time monitoring enabled\n");
+        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Real-time monitoring enabled\n");
         status_message_ = "Monitoring active";
     } else {
-        Log("COLAB.wing.reaper.virtualsoundcheck: Real-time monitoring disabled\n");
+        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Real-time monitoring disabled\n");
         status_message_ = "Monitoring inactive";
     }
 }
@@ -894,20 +894,20 @@ void ReaperExtension::ConfigureVirtualSoundcheck() {
     if (!connected_ || !osc_handler_) {
         ShowMessageBox(
             "Please connect to Wing console first",
-            "COLAB.wing.reaper.virtualsoundcheck - Virtual Soundcheck",
+            "AUDIOLAB.wing.reaper.virtualsoundcheck - Virtual Soundcheck",
             0
         );
         return;
     }
     
-    Log("COLAB.wing.reaper.virtualsoundcheck: Configuring Virtual Soundcheck...\n");
+    Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Configuring Virtual Soundcheck...\n");
     
     // Get all channel data
     const auto& channels = osc_handler_->GetChannelData();
     if (channels.empty()) {
         ShowMessageBox(
             "No channel data available.\nPlease refresh tracks first.",
-            "COLAB.wing.reaper.virtualsoundcheck - Virtual Soundcheck",
+            "AUDIOLAB.wing.reaper.virtualsoundcheck - Virtual Soundcheck",
             0
         );
         return;
@@ -949,7 +949,7 @@ void ReaperExtension::ConfigureVirtualSoundcheck() {
                     if (pair.second.channel_number == partner_num) {
                         additional_channels.push_back(pair.second);
                         included_channel_numbers.insert(partner_num);
-                        ShowConsoleMsg("COLAB.wing.reaper.virtualsoundcheck: Auto-including stereo partner CH");
+                        ShowConsoleMsg("AUDIOLAB.wing.reaper.virtualsoundcheck: Auto-including stereo partner CH");
                         char buf[10];
                         snprintf(buf, sizeof(buf), "%d", partner_num);
                         ShowConsoleMsg(buf);
@@ -974,7 +974,7 @@ void ReaperExtension::ConfigureVirtualSoundcheck() {
             "1. Assign names to Wing channels\n"
             "2. Assign input sources to Wing channels\n"
             "3. Refresh tracks and try again",
-            "COLAB.wing.reaper.virtualsoundcheck - No Channels Available",
+            "AUDIOLAB.wing.reaper.virtualsoundcheck - No Channels Available",
             0
         );
         return;
@@ -996,12 +996,12 @@ void ReaperExtension::ConfigureVirtualSoundcheck() {
     
     int result = ShowMessageBox(
         channel_list.str().c_str(),
-        "COLAB.wing.reaper.virtualsoundcheck - Channel Selection",
+        "AUDIOLAB.wing.reaper.virtualsoundcheck - Channel Selection",
         4  // Yes/No/Cancel
     );
     
     if (result == 0) {
-        Log("COLAB.wing.reaper.virtualsoundcheck: Virtual Soundcheck configuration cancelled\n");
+        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Virtual Soundcheck configuration cancelled\n");
         return;
     }
     
@@ -1036,7 +1036,7 @@ void ReaperExtension::ConfigureVirtualSoundcheck() {
         selected_channels = filtered_channels;
         
         if (selected_channels.empty()) {
-            Log("COLAB.wing.reaper.virtualsoundcheck: No channels remain after filtering. Using all channels.\n");
+            Log("AUDIOLAB.wing.reaper.virtualsoundcheck: No channels remain after filtering. Using all channels.\n");
             selected_channels = selectable_channels;
         }
     }
@@ -1161,7 +1161,7 @@ void ReaperExtension::ConfigureVirtualSoundcheck() {
         }
     }
     
-    Undo_EndBlock("COLAB.wing.reaper.virtualsoundcheck: Configure Virtual Soundcheck", UNDO_STATE_TRACKCFG);
+    Undo_EndBlock("AUDIOLAB.wing.reaper.virtualsoundcheck: Configure Virtual Soundcheck", UNDO_STATE_TRACKCFG);
         
         Log("\n");
         Log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
@@ -1183,7 +1183,7 @@ void ReaperExtension::ConfigureVirtualSoundcheck() {
         
         ShowMessageBox(
             success_msg.str().c_str(),
-            "COLAB.wing.reaper.virtualsoundcheck - Success",
+            "AUDIOLAB.wing.reaper.virtualsoundcheck - Success",
             0
         );
 }
@@ -1192,7 +1192,7 @@ void ReaperExtension::ToggleSoundcheckMode() {
     if (!connected_ || !osc_handler_) {
         ShowMessageBox(
             "Please connect to Wing console first",
-            "COLAB.wing.reaper.virtualsoundcheck - Soundcheck Mode",
+            "AUDIOLAB.wing.reaper.virtualsoundcheck - Soundcheck Mode",
             0
         );
         return;
@@ -1205,10 +1205,10 @@ void ReaperExtension::ToggleSoundcheckMode() {
     osc_handler_->SetAllChannelsAltEnabled(soundcheck_mode_enabled_);
     
     if (soundcheck_mode_enabled_) {
-        Log("COLAB.wing.reaper.virtualsoundcheck: Soundcheck Mode ENABLED - Channels using USB input from REAPER\n");
+        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Soundcheck Mode ENABLED - Channels using USB input from REAPER\n");
         status_message_ = "Soundcheck Mode ON";
     } else {
-        Log("COLAB.wing.reaper.virtualsoundcheck: Soundcheck Mode DISABLED - Channels using primary sources\n");
+        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Soundcheck Mode DISABLED - Channels using primary sources\n");
         status_message_ = "Soundcheck Mode OFF";
     }
 }

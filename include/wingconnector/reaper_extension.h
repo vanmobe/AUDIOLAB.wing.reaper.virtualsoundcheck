@@ -115,13 +115,13 @@ private:
         int cc_number;
     };
     static constexpr MidiAction MIDI_ACTIONS[] = {
-        {40157, "COLAB.wing.reaper.virtualsoundcheck: Set Marker", 20},
-        {40172, "COLAB.wing.reaper.virtualsoundcheck: Previous Marker", 21},
-        {40173, "COLAB.wing.reaper.virtualsoundcheck: Next Marker", 22},
-        {1013, "COLAB.wing.reaper.virtualsoundcheck: Record", 23},
-        {1016, "COLAB.wing.reaper.virtualsoundcheck: Stop", 24},
-        {1007, "COLAB.wing.reaper.virtualsoundcheck: Play", 25},
-        {1008, "COLAB.wing.reaper.virtualsoundcheck: Pause", 26}
+        {40157, "AUDIOLAB.wing.reaper.virtualsoundcheck: Set Marker", 20},
+        {40172, "AUDIOLAB.wing.reaper.virtualsoundcheck: Previous Marker", 21},
+        {40173, "AUDIOLAB.wing.reaper.virtualsoundcheck: Next Marker", 22},
+        {1013, "AUDIOLAB.wing.reaper.virtualsoundcheck: Record", 23},
+        {1016, "AUDIOLAB.wing.reaper.virtualsoundcheck: Stop", 24},
+        {1007, "AUDIOLAB.wing.reaper.virtualsoundcheck: Play", 25},
+        {1008, "AUDIOLAB.wing.reaper.virtualsoundcheck: Pause", 26}
     };
     
     void RegisterMidiShortcuts();

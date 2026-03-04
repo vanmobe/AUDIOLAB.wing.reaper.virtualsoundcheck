@@ -1,9 +1,9 @@
 @echo off
-REM Installation script for Reaper COLAB.wing.reaper.virtualsoundcheck (Windows)
+REM Installation script for Reaper AUDIOLAB.wing.reaper.virtualsoundcheck (Windows)
 REM This script installs dependencies and sets up the extension
 
 echo =========================================
-echo Reaper COLAB.wing.reaper.virtualsoundcheck - Installation
+echo Reaper AUDIOLAB.wing.reaper.virtualsoundcheck - Installation
 echo =========================================
 echo.
 

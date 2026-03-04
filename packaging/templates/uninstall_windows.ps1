@@ -8,4 +8,4 @@ $configPath = Join-Path $targetDir $configName
 if (Test-Path $pluginPath) { Remove-Item $pluginPath -Force }
 if (Test-Path $configPath) { Remove-Item $configPath -Force }
 
-Write-Host "Removed COLAB.wing.reaper.virtualsoundcheck from $targetDir"
+Write-Host "Removed AUDIOLAB.wing.reaper.virtualsoundcheck from $targetDir"

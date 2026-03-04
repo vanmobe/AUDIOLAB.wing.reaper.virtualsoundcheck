@@ -1,6 +1,6 @@
-# COLAB.wing.reaper.virtualsoundcheck Installation Guide
+# AUDIOLAB.wing.reaper.virtualsoundcheck Installation Guide
 
-COLAB.wing.reaper.virtualsoundcheck provides ready-to-use installers for all supported desktop platforms.
+AUDIOLAB.wing.reaper.virtualsoundcheck provides ready-to-use installers for all supported desktop platforms.
 
 - macOS: `.pkg`
 - Windows: `.exe`
@@ -26,10 +26,10 @@ Platform requirements:
 
 ## macOS
 
-1. Download the latest `COLAB-wing-reaper-virtualsoundcheck-*-macos-installer.pkg`.
+1. Download the latest `AUDIOLAB-Virtual-Soundcheck-v*-macOS.pkg`.
 2. Double-click the package and follow prompts.
 3. Restart REAPER.
-4. Open `Extensions -> COLAB.wing.reaper.virtualsoundcheck`.
+4. Open `Extensions -> AUDIOLAB.wing.reaper.virtualsoundcheck`.
 
 Default plugin path:
 
@@ -37,10 +37,10 @@ Default plugin path:
 
 ## Windows
 
-1. Download the latest `COLAB-wing-reaper-virtualsoundcheck-*-windows-setup.exe`.
+1. Download the latest `AUDIOLAB-Virtual-Soundcheck-v*-Windows-Setup.exe`.
 2. Run the installer and complete setup.
 3. Restart REAPER.
-4. Open `Extensions -> COLAB.wing.reaper.virtualsoundcheck`.
+4. Open `Extensions -> AUDIOLAB.wing.reaper.virtualsoundcheck`.
 
 Default plugin path:
 
@@ -48,15 +48,15 @@ Default plugin path:
 
 ## Linux (Debian/Ubuntu)
 
-1. Download the latest `colab-wing-reaper-virtualsoundcheck_*_amd64.deb` (or matching arch).
+1. Download the latest `AUDIOLAB-Virtual-Soundcheck-v*-<arch>.deb` (or matching arch).
 2. Install with your package manager, for example:
 
 ```bash
-sudo apt install ./colab-wing-reaper-virtualsoundcheck_<version>_<arch>.deb
+sudo apt install ./AUDIOLAB-Virtual-Soundcheck-v<version>-<arch>.deb
 ```
 
 3. Restart REAPER.
-4. Open `Extensions -> COLAB.wing.reaper.virtualsoundcheck`.
+4. Open `Extensions -> AUDIOLAB.wing.reaper.virtualsoundcheck`.
 
 Default plugin path:
 
@@ -64,7 +64,7 @@ Default plugin path:
 
 ## First Run
 
-1. Go to `Extensions -> COLAB.wing.reaper.virtualsoundcheck -> Connect to Behringer Wing`.
+1. Go to `Extensions -> AUDIOLAB.wing.reaper.virtualsoundcheck -> Connect to Behringer Wing`.
 2. Set WING IP and port (default `2223`).
 3. Fetch channels and confirm track creation.
 

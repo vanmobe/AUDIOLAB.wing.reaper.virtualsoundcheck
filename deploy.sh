@@ -1,10 +1,10 @@
 #!/bin/bash
-# Deploy script for COLAB.wing.reaper.virtualsoundcheck
+# Deploy script for AUDIOLAB.wing.reaper.virtualsoundcheck
 # This builds and deploys both the plugin and config file
 
 set -e  # Exit on error
 
-echo "Building COLAB.wing.reaper.virtualsoundcheck..."
+echo "Building AUDIOLAB.wing.reaper.virtualsoundcheck..."
 cd "$(dirname "$0")/build"
 make -j4
 

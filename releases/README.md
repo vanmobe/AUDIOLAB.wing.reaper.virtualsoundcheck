@@ -8,9 +8,9 @@ Primary distribution is via GitHub Releases:
 
 ## Installer Types
 
-- macOS: `COLAB-wing-reaper-virtualsoundcheck-<version>-macos-installer.pkg`
-- Windows: `COLAB-wing-reaper-virtualsoundcheck-<version>-windows-setup.exe`
-- Linux: `colab-wing-reaper-virtualsoundcheck_<version>_<arch>.deb`
+- macOS: `AUDIOLAB-Virtual-Soundcheck-v<version>-macOS.pkg`
+- Windows: `AUDIOLAB-Virtual-Soundcheck-v<version>-Windows-Setup.exe`
+- Linux: `AUDIOLAB-Virtual-Soundcheck-v<version>-<arch>.deb`
 
 ## How Releases Are Built
 

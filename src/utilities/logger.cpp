@@ -1,5 +1,5 @@
 /*
- * Unified Logging System for COLAB.wing.reaper.virtualsoundcheck
+ * Unified Logging System for AUDIOLAB.wing.reaper.virtualsoundcheck
  */
 
 #include "internal/logger.h"

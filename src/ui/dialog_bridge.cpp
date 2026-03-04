@@ -25,9 +25,9 @@ void RunCrossPlatformDialog() {
         const bool connected = extension.ConnectToWing();
         if (!connected) {
             ShowMessageBox(
-                "COLAB.wing.reaper.virtualsoundcheck could not connect.\n\n"
+                "AUDIOLAB.wing.reaper.virtualsoundcheck could not connect.\n\n"
                 "Set wing_ip in config.json and ensure OSC is enabled on the console.",
-                "COLAB.wing.reaper.virtualsoundcheck",
+                "AUDIOLAB.wing.reaper.virtualsoundcheck",
                 0);
             return;
         }
@@ -37,7 +37,7 @@ void RunCrossPlatformDialog() {
     if (channels.empty()) {
         ShowMessageBox(
             "Connected, but no channels with sources were discovered.",
-            "COLAB.wing.reaper.virtualsoundcheck",
+            "AUDIOLAB.wing.reaper.virtualsoundcheck",
             0);
         return;
     }
@@ -50,7 +50,7 @@ void RunCrossPlatformDialog() {
     ShowMessageBox(
         "Connected and configured live recording for available channels.\n"
         "Use config.json for advanced selection and behavior.",
-        "COLAB.wing.reaper.virtualsoundcheck",
+        "AUDIOLAB.wing.reaper.virtualsoundcheck",
         0);
 }
 #endif

@@ -7,7 +7,7 @@ OUT_DIR="${3:-releases}"
 
 PLUGIN_NAME="reaper_wingconnector.dylib"
 CONFIG_NAME="config.json"
-PKG_ID="com.colab.wing.reaper.virtualsoundcheck"
+PKG_ID="com.audiolab.wing.reaper.virtualsoundcheck"
 INSTALL_TARGET="/Library/Application Support/REAPER/UserPlugins"
 
 if ! command -v pkgbuild >/dev/null 2>&1; then
@@ -51,7 +51,7 @@ exit 0
 POSTINSTALL
 chmod +x "$PKG_SCRIPTS/postinstall"
 
-OUT_FILE="$OUT_DIR/COLAB-wing-reaper-virtualsoundcheck-$VERSION-macos-installer.pkg"
+OUT_FILE="$OUT_DIR/AUDIOLAB-Virtual-Soundcheck-v$VERSION-macOS.pkg"
 pkgbuild \
   --root "$TMP_ROOT/pkg_root" \
   --scripts "$PKG_SCRIPTS" \

@@ -1,8 +1,8 @@
 @echo off
-REM Build script for COLAB.wing.reaper.virtualsoundcheck (Windows)
+REM Build script for AUDIOLAB.wing.reaper.virtualsoundcheck (Windows)
 
 echo =========================================
-echo COLAB.wing.reaper.virtualsoundcheck - Build Script (Windows)
+echo AUDIOLAB.wing.reaper.virtualsoundcheck - Build Script (Windows)
 echo =========================================
 echo.
 

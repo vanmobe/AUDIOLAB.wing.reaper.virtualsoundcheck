@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Dependency download script for COLAB.wing.reaper.virtualsoundcheck
+# Dependency download script for AUDIOLAB.wing.reaper.virtualsoundcheck
 # Downloads required third-party libraries
 
 set -e
 
 echo "========================================="
-echo "COLAB.wing.reaper.virtualsoundcheck - Dependency Setup"
+echo "AUDIOLAB.wing.reaper.virtualsoundcheck - Dependency Setup"
 echo "========================================="
 echo ""
 

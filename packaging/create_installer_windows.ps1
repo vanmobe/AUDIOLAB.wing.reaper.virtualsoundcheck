@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 
 $pluginName = 'reaper_wingconnector.dll'
 $configName = 'config.json'
-$appName = 'COLAB.wing.reaper.virtualsoundcheck'
+$appName = 'AUDIOLAB.wing.reaper.virtualsoundcheck'
 
 $stagePath = (Resolve-Path $StageDir).Path
 if (-not (Test-Path (Join-Path $stagePath $pluginName))) {
@@ -31,9 +31,9 @@ if (-not $iscc) {
     }
 }
 
-$tmpRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("colab-wing-reaper-virtualsoundcheck-win-" + [System.Guid]::NewGuid().ToString('N'))
+$tmpRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("audiolab-virtual-soundcheck-win-" + [System.Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmpRoot -Force | Out-Null
-$issPath = Join-Path $tmpRoot 'colab-wing-reaper-virtualsoundcheck.iss'
+$issPath = Join-Path $tmpRoot 'audiolab-virtual-soundcheck.iss'
 
 $iss = @"
 [Setup]
@@ -45,7 +45,7 @@ DefaultDirName={userappdata}\REAPER\UserPlugins
 DisableDirPage=yes
 DisableProgramGroupPage=yes
 OutputDir=$outPath
-OutputBaseFilename=COLAB-wing-reaper-virtualsoundcheck-$Version-windows-setup
+OutputBaseFilename=AUDIOLAB-Virtual-Soundcheck-v$Version-Windows-Setup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -70,7 +70,7 @@ Set-Content -Path $issPath -Value $iss -NoNewline
 
 & $iscc.Source $issPath | Out-Host
 
-$exePath = Join-Path $outPath "COLAB-wing-reaper-virtualsoundcheck-$Version-windows-setup.exe"
+$exePath = Join-Path $outPath "AUDIOLAB-Virtual-Soundcheck-v$Version-Windows-Setup.exe"
 if (-not (Test-Path $exePath)) {
     throw "Expected installer not found: $exePath"
 }
