@@ -1,0 +1,94 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-package:
+    name: Build + Package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            artifact_name: wingconnector-macos-installer
+          - os: windows-latest
+            artifact_name: wingconnector-windows-setup-exe
+          - os: ubuntu-latest
+            artifact_name: wingconnector-linux-deb
+
+    env:
+      VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '1.0.0-dev' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Normalize version
+        shell: bash
+        run: |
+          RAW_VERSION="${VERSION}"
+          CLEAN_VERSION="${RAW_VERSION#v}"
+          echo "VERSION=${CLEAN_VERSION}" >> "$GITHUB_ENV"
+
+      - name: Configure (CMake)
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release -j 4
+
+      - name: Stage install
+        run: cmake --install build --config Release --prefix stage
+
+      - name: Install Inno Setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Package macOS installer
+        if: runner.os == 'macOS'
+        shell: bash
+        run: ./packaging/create_installer_macos.sh "$VERSION" stage releases
+
+      - name: Package Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./packaging/create_installer_windows.ps1 -Version "$env:VERSION" -StageDir stage -OutDir releases
+
+      - name: Package Linux installer
+        if: runner.os == 'Linux'
+        shell: bash
+        run: ./packaging/create_installer_linux.sh "$VERSION" stage releases
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: releases/*
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-and-package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download packaged installers
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create release with assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

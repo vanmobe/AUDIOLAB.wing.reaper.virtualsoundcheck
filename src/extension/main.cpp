@@ -19,9 +19,7 @@
 #include "reaper_plugin_functions.h"
 #include "wingconnector/reaper_extension.h"
 #include "internal/logger.h"
-#ifdef __APPLE__
-#include "internal/wing_connector_dialog_macos.h"
-#endif
+#include "internal/dialog_bridge.h"
 #include <string>
 #include <cstring>
 #include <cstdint>
@@ -73,15 +71,8 @@ static bool OnAction(KbdSectionInfo* sec, int cmd, int val, int valhw, int relmo
     // Check if this is our Wing Connector command
     if (cmd == g_cmd_main_dialog) {
         Logger::Debug("Main dialog command triggered!");
-        
-        #ifdef __APPLE__
-        Logger::Debug("Calling ShowWingConnectorDialog()");
-        
-        // Show the connection dialog on macOS
-        ShowWingConnectorDialog();
-        
-        Logger::Debug("ShowWingConnectorDialog() returned");
-        #endif
+
+        ShowMainDialog();
         return true;  // Command handled
     }
 
@@ -171,14 +162,6 @@ int REAPER_PLUGIN_DLL_EXPORT REAPER_PLUGIN_ENTRYPOINT(
     REAPER_PLUGIN_HINSTANCE hInstance,
     reaper_plugin_info_t* rec)
 {
-    // Write marker file to verify plugin loaded
-    FILE* f = fopen("/tmp/wing_plugin_loaded.txt", "w");
-    if (f) {
-        fprintf(f, "PLUGIN LOADED AT: ENTRY POINT\n");
-        fflush(f);
-        fclose(f);
-    }
-    
     Logger::Initialize(true);
     Logger::Info("================================================================");
     Logger::Info("REAPER_PLUGIN_ENTRYPOINT called - PLUGIN LOADING");

@@ -7,8 +7,8 @@
 #include <string>
 
 // Forward declare Reaper types
-struct MediaTrack;
-struct ReaProject;
+class MediaTrack;
+class ReaProject;
 
 namespace WingConnector {
 

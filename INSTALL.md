@@ -1,8 +1,16 @@
 # Wing Connector Installation Guide
 
-> **Platform Support:** Wing Connector currently supports macOS only. Windows and Linux support is planned for future releases.
+> **Platform Support:** Wing Connector supports macOS, Windows, and Linux.
 
 > **⚠️ Disclaimer:** This software is provided as-is for use at your own risk. No guarantees or official support are provided. See the main [README](README.md) for full warranty information.
+
+## Installation by Platform
+
+- macOS: use the `.pkg` installer artifact
+- Windows: run the `.exe` installer artifact
+- Linux: install the `.deb` package artifact (double-click in GUI or use your package manager)
+
+The repository release workflow (`.github/workflows/release.yml`) generates these artifacts automatically for tagged releases.
 
 ## macOS Installation
 

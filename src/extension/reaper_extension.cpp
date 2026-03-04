@@ -18,7 +18,11 @@
 #include <algorithm>
 #include <set>
 #include <ctime>
+#ifdef _WIN32
+#include <sys/utime.h>
+#else
 #include <utime.h>
+#endif
 
 // C-style wrapper function for MIDI hook (REAPER requires a C function, not a member function)
 extern "C" bool WingMidiInputHookWrapper(bool is_midi, const unsigned char* data, int len, int dev_id) {
@@ -30,6 +34,17 @@ namespace WingConnector {
 namespace {
 constexpr int kChannelQueryAttempts = 2;
 constexpr int kQueryResponseWaitMs = 600;  // Wait time for OSC responses after sending all queries
+
+bool TouchFile(const std::string& path) {
+    time_t now = time(nullptr);
+#ifdef _WIN32
+    struct _utimbuf times = {now, now};
+    return _utime(path.c_str(), &times) == 0;
+#else
+    struct utimbuf times = {now, now};
+    return utime(path.c_str(), &times) == 0;
+#endif
+}
 }  // namespace
 
 // Static member definition
@@ -106,20 +121,6 @@ bool ReaperExtension::Initialize(reaper_plugin_info_t* rec) {
     // Store g_rec context for later use in EnableMidiActions
     if (rec) {
         g_rec_ = rec;
-        FILE* log_f = fopen("/tmp/wing_connector_debug.log", "a");
-        if (log_f) {
-            fprintf(log_f, "🔧 [WING] Stored REAPER plugin context (g_rec_ = %p)\n", (void*)rec);
-            fprintf(log_f, "🔧 [WING] g_rec_->Register = %p\n", (void*)rec->Register);
-            fflush(log_f);
-            fclose(log_f);
-        }
-    } else {
-        FILE* log_f = fopen("/tmp/wing_connector_debug.log", "a");
-        if (log_f) {
-            fprintf(log_f, "🔧 [WING] WARNING: g_rec parameter is nullptr!\n");
-            fflush(log_f);
-            fclose(log_f);
-        }
     }
     
     // Load configuration
@@ -815,27 +816,16 @@ void ReaperExtension::RefreshTracks() {
 }
 
 void ReaperExtension::ShowSettings() {
-    FILE* dbg = fopen("/tmp/wing_debug.log", "a");
-    fprintf(dbg, "[ShowSettings] Called\n");
-    fflush(dbg);
-    
     #ifdef __APPLE__
     // Use native macOS dialog for settings
-    fprintf(dbg, "[ShowSettings] Apple platform\n");
-    fflush(dbg);
-    
     char ip_buffer[256];
     
     strncpy(ip_buffer, config_.wing_ip.c_str(), sizeof(ip_buffer) - 1);
     ip_buffer[sizeof(ip_buffer) - 1] = '\0';
-    fprintf(dbg, "[ShowSettings] Buffers prepared, calling ShowSettingsDialog\n");
-    fflush(dbg);
     
     // Show native Cocoa dialog
     if (ShowSettingsDialog(config_.wing_ip.c_str(),
                           ip_buffer, sizeof(ip_buffer))) {
-        fprintf(dbg, "[ShowSettings] Dialog confirmed\n");
-        fflush(dbg);
         // Validate IP
         std::string new_ip = ip_buffer;
         if (new_ip.empty() || new_ip.length() > 15) {
@@ -1344,9 +1334,7 @@ void ReaperExtension::RegisterMidiShortcuts() {
     // Touch the file to update modification time
     // This triggers REAPER's file watcher to reload keyboard shortcuts
     // without requiring a restart
-    time_t now = time(nullptr);
-    struct utimbuf times = {now, now};
-    if (utime(kb_ini_path.c_str(), &times) == 0) {
+    if (TouchFile(kb_ini_path)) {
         Log("✓ Updated reaper-kb.ini modification time\n");
         Log("✓ REAPER should reload shortcuts automatically\n\n");
     } else {
@@ -1392,9 +1380,7 @@ void ReaperExtension::UnregisterMidiShortcuts() {
     
     // Touch the file to update modification time
     // This triggers REAPER's file watcher to reload keyboard shortcuts
-    time_t now = time(nullptr);
-    struct utimbuf times = {now, now};
-    if (utime(kb_ini_path.c_str(), &times) == 0) {
+    if (TouchFile(kb_ini_path)) {
         Log("✓ MIDI shortcuts removed and reloader triggered\n");
     } else {
         Log("MIDI shortcuts removed from reaper-kb.ini\n");
@@ -1456,14 +1442,6 @@ bool ReaperExtension::MidiInputHook(bool is_midi, const unsigned char* data, int
     // Log EVERY call to both file and instance log for debugging
     static int call_count = 0;
     call_count++;
-    
-    FILE* log_f = fopen("/tmp/wing_connector_debug.log", "a");
-    if (log_f) {
-        fprintf(log_f, "[HOOK CALLED #%d] is_midi=%d, len=%d, dev_id=%d\n", 
-                call_count, is_midi, len, dev_id);
-        fflush(log_f);
-        fclose(log_f);
-    }
     
     if (call_count <= 5 || call_count % 100 == 0) {  // Log first 5 calls to UI, then every 100th
         char debug[128];

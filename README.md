@@ -2,11 +2,23 @@
 
 A C++ Reaper extension that connects to a Behringer Wing console via UDP/OSC to automatically set up recording tracks based on the Wing's channel configuration.
 
-**Status:** ✅ Production Ready | **Version:** 1.0.0 | **License:** MIT | **Platform:** macOS only (for now)
+**Status:** ✅ Production Ready | **Version:** 1.0.0 | **License:** MIT | **Platform:** macOS, Windows, Linux
 
 **📖 [Visual User Guide](docs/USER_GUIDE.md)** — Complete step-by-step guide with screenshots
 
 > **⚠️ Disclaimer:** This software is provided as-is for use at your own risk. While functional and tested, no guarantees or official support are provided. Suggestions and contributions are welcome! See [License & Warranty](#license--warranty) for details.
+
+---
+
+## Installers
+
+Prebuilt installer artifacts are produced for all platforms:
+
+- macOS: `.pkg` installer
+- Windows: `.exe` installer
+- Linux: `.deb` package
+
+For tagged releases (`v*`), GitHub Actions builds and publishes these artifacts automatically.
 
 ---
 
@@ -68,7 +80,7 @@ Wing Connector bridges your Behringer Wing console and Reaper DAW, automating tr
 - ✅ **Stereo Channel Pairing** — Optional automatic grouping of stereo channel pairs
 - ✅ **Complete Channel Metadata** — Captures names, colors, icons, and routing information
 - ✅ **Wing Button Control** — Control REAPER actions directly from Wing custom buttons (MIDI)
-- ✅ **macOS Support** — Currently available for macOS only (Windows and Linux support planned)
+- ✅ **Cross-Platform Support** — macOS (native Cocoa UI), Windows/Linux (interactive REAPER dialogs)
 
 ### Available Actions
 

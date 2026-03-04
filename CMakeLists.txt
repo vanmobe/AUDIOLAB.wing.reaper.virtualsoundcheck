@@ -43,6 +43,9 @@ set(SOURCES
     
     # Track management
     src/track/track_manager.cpp
+
+    # Cross-platform UI bridge
+    src/ui/dialog_bridge.cpp
 )
 
 # Platform-specific source files
