@@ -31,7 +31,10 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
-// Windows headers define EndMessage macro, which conflicts with osc::EndMessage.
+// Windows headers define BeginMessage/EndMessage macros that conflict with oscpack.
+#ifdef BeginMessage
+#undef BeginMessage
+#endif
 #ifdef EndMessage
 #undef EndMessage
 #endif
