@@ -90,11 +90,11 @@ constexpr int kHandshakeTimeoutMs = 1500;  // Discovery timeout
 namespace WingConnector {
 
 static inline osc::BeginMessage MakeOscBeginToken(const char* address) {
-    return osc::BeginMessage{address};
+    return osc::BeginMessage(address);
 }
 
 static inline osc::MessageTerminator MakeOscEndToken() {
-    return osc::MessageTerminator{};
+    return {};
 }
 
 /**
