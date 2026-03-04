@@ -81,6 +81,18 @@
 #include <unistd.h>
 #endif
 
+#if defined(_WIN32)
+#ifdef ReceivedMessage
+#undef ReceivedMessage
+#endif
+#ifdef BeginMessage
+#undef BeginMessage
+#endif
+#ifdef EndMessage
+#undef EndMessage
+#endif
+#endif
+
 namespace {
 constexpr uint16_t kWingHandshakePort = 2222;  // Wing discovery port
 constexpr const char* kWingHandshakeProbe = "WING?";  // Discovery message
