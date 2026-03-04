@@ -2,6 +2,8 @@
  * Reaper Extension Main Class Implementation
  */
 
+#include <cstring>
+
 #include "wingconnector/reaper_extension.h"
 #include "reaper_plugin_functions.h"
 #ifdef __APPLE__
@@ -10,7 +12,6 @@
 #include <chrono>
 #include <thread>
 #include <cstdlib>
-#include <cstring>
 #include <cstdio>
 #include <fstream>
 #include <sstream>

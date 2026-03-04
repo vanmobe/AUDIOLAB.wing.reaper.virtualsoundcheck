@@ -16,6 +16,8 @@
  * - Track cache management
  */
 
+#include <cstring>
+
 #include "wingconnector/track_manager.h"
 #include "reaper_plugin_functions.h"
 #include <algorithm>

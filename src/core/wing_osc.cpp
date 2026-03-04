@@ -25,6 +25,8 @@
  * - Trigger callbacks when data is received
  */
 
+#include <cstring>
+
 #include "wingconnector/wing_osc.h"
 #include "internal/logger.h"
 #include "internal/osc_helpers.h"
@@ -43,7 +45,6 @@
 #include <set>
 #include <map>
 #include <algorithm>
-#include <cstring>
 #include <fstream>
 #include <ctime>
 

@@ -2,6 +2,8 @@
  * Cross-platform dialog bridge.
  */
 
+#include <cstring>
+
 #include "internal/dialog_bridge.h"
 #include "wingconnector/reaper_extension.h"
 #ifdef __APPLE__

@@ -15,13 +15,14 @@
  * 4. Custom actions and keyboard shortcuts
  */
 
+#include <cstring>
+
 #define REAPERAPI_IMPLEMENT
 #include "reaper_plugin_functions.h"
 #include "wingconnector/reaper_extension.h"
 #include "internal/logger.h"
 #include "internal/dialog_bridge.h"
 #include <string>
-#include <cstring>
 #include <cstdint>
 #include <cstdio>
 #include <fstream>
