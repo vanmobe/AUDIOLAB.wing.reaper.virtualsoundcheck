@@ -13,7 +13,7 @@
 namespace WingConnector {
 
 bool Logger::console_enabled_ = true;
-LogLevel Logger::min_level_ = LogLevel::DEBUG;
+LogLevel Logger::min_level_ = LogLevel::Debug;
 
 static std::mutex g_log_mutex;
 
@@ -29,10 +29,10 @@ void Logger::SetLogLevel(LogLevel level) {
 
 const char* Logger::LevelToString(LogLevel level) {
     switch (level) {
-        case LogLevel::DEBUG: return "DEBUG";
-        case LogLevel::INFO:  return "INFO";
-        case LogLevel::WARN:  return "WARN";
-        case LogLevel::ERROR: return "ERROR";
+        case LogLevel::Debug: return "DEBUG";
+        case LogLevel::Info:  return "INFO";
+        case LogLevel::Warn:  return "WARN";
+        case LogLevel::Error: return "ERROR";
         default: return "UNKNOWN";
     }
 }
@@ -74,28 +74,28 @@ void Logger::LogInternal(LogLevel level, const char* fmt, va_list args) {
 void Logger::Debug(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    LogInternal(LogLevel::DEBUG, fmt, args);
+    LogInternal(LogLevel::Debug, fmt, args);
     va_end(args);
 }
 
 void Logger::Info(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    LogInternal(LogLevel::INFO, fmt, args);
+    LogInternal(LogLevel::Info, fmt, args);
     va_end(args);
 }
 
 void Logger::Warn(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    LogInternal(LogLevel::WARN, fmt, args);
+    LogInternal(LogLevel::Warn, fmt, args);
     va_end(args);
 }
 
 void Logger::Error(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    LogInternal(LogLevel::ERROR, fmt, args);
+    LogInternal(LogLevel::Error, fmt, args);
     va_end(args);
 }
 

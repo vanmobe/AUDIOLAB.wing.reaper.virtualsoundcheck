@@ -7,10 +7,10 @@
 namespace WingConnector {
 
 enum class LogLevel {
-    DEBUG = 0,
-    INFO = 1,
-    WARN = 2,
-    ERROR = 3
+    Debug = 0,
+    Info = 1,
+    Warn = 2,
+    Error = 3
 };
 
 class Logger {
