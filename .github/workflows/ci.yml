@@ -41,7 +41,19 @@ jobs:
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
-        run: cmake --build build --config Release -j 4
+        shell: bash
+        run: |
+          set +e
+          cmake --build build --config Release -j 4 2>&1 | tee build.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            tail_text="$(tail -n 80 build.log)"
+            tail_text="${tail_text//'%'/'%25'}"
+            tail_text="${tail_text//$'\n'/'%0A'}"
+            tail_text="${tail_text//$'\r'/'%0D'}"
+            echo "::error title=Build failed::${tail_text}"
+            exit "$status"
+          fi
 
       - name: Stage install
         run: cmake --install build --config Release --prefix stage
