@@ -45,6 +45,12 @@
 #include "internal/osc_routing.h"
 
 #if defined(_WIN32)
+#ifdef ReceivedPacket
+#undef ReceivedPacket
+#endif
+#ifdef ReceivedBundle
+#undef ReceivedBundle
+#endif
 #ifdef BeginMessage
 #undef BeginMessage
 #endif
@@ -82,6 +88,12 @@
 #endif
 
 #if defined(_WIN32)
+#ifdef ReceivedPacket
+#undef ReceivedPacket
+#endif
+#ifdef ReceivedBundle
+#undef ReceivedBundle
+#endif
 #ifdef ReceivedMessage
 #undef ReceivedMessage
 #endif
