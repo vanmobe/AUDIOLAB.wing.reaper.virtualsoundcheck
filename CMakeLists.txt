@@ -6,6 +6,14 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+# Validate required REAPER SDK headers
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/reaper-sdk/reaper_plugin.h" OR
+   NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/reaper-sdk/reaper_plugin_functions.h")
+    message(FATAL_ERROR
+        "Missing REAPER SDK headers in lib/reaper-sdk/. "
+        "Required: reaper_plugin.h and reaper_plugin_functions.h")
+endif()
+
 # Enable Objective-C for macOS settings dialog
 if(APPLE)
     enable_language(OBJC)

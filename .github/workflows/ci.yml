@@ -19,6 +19,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Fetch REAPER SDK headers
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "lib/reaper-sdk" | Out-Null
+          Invoke-WebRequest -Uri "https://www.reaper.fm/sdk/plugin/reaper_plugin.h" -OutFile "lib/reaper-sdk/reaper_plugin.h"
+          Invoke-WebRequest -Uri "https://www.reaper.fm/sdk/plugin/reaper_plugin_functions.h" -OutFile "lib/reaper-sdk/reaper_plugin_functions.h"
+
       - name: Configure (CMake)
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
