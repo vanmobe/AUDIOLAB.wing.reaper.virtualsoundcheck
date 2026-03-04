@@ -48,6 +48,15 @@
 #ifdef EndMessage
 #undef EndMessage
 #endif
+#ifdef MessageTerminator
+#undef MessageTerminator
+#endif
+#ifdef OscPacketListener
+#undef OscPacketListener
+#endif
+#ifdef ReceivedMessage
+#undef ReceivedMessage
+#endif
 #endif
 
 #include "osc/OscReceivedElements.h"
