@@ -5,6 +5,7 @@
 
 #include "wingconnector/wing_config.h"
 #include "internal/platform_util.h"
+#include <algorithm>
 #include <fstream>
 #include <cstdlib>
 #include <filesystem>
@@ -31,17 +32,17 @@ bool WingConfig::LoadFromFile(const std::string& filepath) {
         file.close();
         
         // Extract values with defaults
-        wing_ip = config.value("wing_ip", "127.0.0.1");
+        wing_ip = config.value("wing_ip", "192.168.1.100");
         // Wing OSC port is fixed to 2223; keep ports constant in-memory.
         wing_port = 2223;
         listen_port = 2223;
         channel_count = config.value("channel_count", 48);
-        timeout_ms = config.value("timeout", 10) * 1000;  // Convert to ms
-        track_prefix = config.value("track_prefix", "");
+        timeout_ms = config.value("timeout", 2) * 1000;  // Convert to ms
+        track_prefix = config.value("track_prefix", "Wing");
         include_channels = config.value("include_channels", "");
         exclude_channels = config.value("exclude_channels", "");
         soundcheck_output_mode = config.value("soundcheck_output_mode", "USB");
-        create_stereo_pairs = config.value("create_stereo_pairs", true);
+        create_stereo_pairs = config.value("create_stereo_pairs", false);
         color_tracks = config.value("color_tracks", true);
         configure_midi_actions = config.value("configure_midi_actions", false);
         auto_record_enabled = config.value("auto_record_enabled", false);
@@ -68,9 +69,15 @@ bool WingConfig::LoadFromFile(const std::string& filepath) {
         // Extract color if present
         if (config.contains("default_track_color") && config["default_track_color"].is_object()) {
             const auto& color_obj = config["default_track_color"];
-            default_color.r = color_obj.value("r", 80);
-            default_color.g = color_obj.value("g", 80);
-            default_color.b = color_obj.value("b", 80);
+            const int default_r = 100;
+            const int default_g = 150;
+            const int default_b = 200;
+            const int r = std::clamp(color_obj.value("r", default_r), 0, 255);
+            const int g = std::clamp(color_obj.value("g", default_g), 0, 255);
+            const int b = std::clamp(color_obj.value("b", default_b), 0, 255);
+            default_color.r = static_cast<uint8_t>(r);
+            default_color.g = static_cast<uint8_t>(g);
+            default_color.b = static_cast<uint8_t>(b);
         }
         
         return true;

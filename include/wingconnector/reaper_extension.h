@@ -12,6 +12,8 @@ struct reaper_plugin_info_t;
 #include <vector>
 #include <functional>
 #include <thread>
+#include <mutex>
+class midi_Input;
 
 namespace WingConnector {
 
@@ -51,16 +53,13 @@ public:
     bool ValidateLiveRecordingSetup(std::string& details);
     void RouteMainLRToCardForSDRecording();
     double ReadCurrentTriggerLevel();
-    void SendWarningOscNow();
-    void SendStartOscNow();
-    void SendStopOscNow();
-    void TestWarningFlash();
     void ApplyAutoRecordSettings();
+    void SyncMidiActionsToWing();
+    void PauseAutoRecordForSetup();
     
     // MIDI action mapping
     void EnableMidiActions(bool enable);
     bool IsMidiActionsEnabled() const { return midi_actions_enabled_; }
-    bool AreMidiShortcutsRegistered() const;  // Verify shortcuts exist in reaper-kb.ini
     void EnableWingMidiDevice();
     
     // Legacy actions (keep for backward compatibility)
@@ -125,17 +124,19 @@ private:
         int cc_number;
     };
     static constexpr MidiAction MIDI_ACTIONS[] = {
-        {40157, "AUDIOLAB.wing.reaper.virtualsoundcheck: Set Marker", 20},
-        {40172, "AUDIOLAB.wing.reaper.virtualsoundcheck: Previous Marker", 21},
-        {40173, "AUDIOLAB.wing.reaper.virtualsoundcheck: Next Marker", 22},
-        {1013, "AUDIOLAB.wing.reaper.virtualsoundcheck: Record", 23},
-        {1016, "AUDIOLAB.wing.reaper.virtualsoundcheck: Stop", 24},
-        {1007, "AUDIOLAB.wing.reaper.virtualsoundcheck: Play", 25},
-        {1008, "AUDIOLAB.wing.reaper.virtualsoundcheck: Pause", 26}
+        {1007,  "AUDIOLAB.wing.reaper.virtualsoundcheck: Play", 20},
+        {1013,  "AUDIOLAB.wing.reaper.virtualsoundcheck: Record", 21},
+        {0,     "AUDIOLAB.wing.reaper.virtualsoundcheck: Toggle Virtual Soundcheck", 22},
+        {40667, "AUDIOLAB.wing.reaper.virtualsoundcheck: Stop", 23},
+        {40157, "AUDIOLAB.wing.reaper.virtualsoundcheck: Set Marker", 24},
+        {40172, "AUDIOLAB.wing.reaper.virtualsoundcheck: Previous Marker", 25},
+        {40173, "AUDIOLAB.wing.reaper.virtualsoundcheck: Next Marker", 26}
     };
     
-    void RegisterMidiShortcuts();
     void UnregisterMidiShortcuts();
+    void StartMidiCapture();
+    void StopMidiCapture();
+    void MidiCaptureLoop();
     
     // MIDI input handling  
     void ProcessMidiInput(const unsigned char* data, int len);
@@ -149,6 +150,12 @@ private:
     void SetWarningLayerState();
     void SetRecordingLayerState();
     void ClearLayerState();
+    void ApplyMidiShortcutButtonLabels();
+    void ClearMidiShortcutButtonLabels();
+    void ApplyMidiShortcutButtonCommands();
+    void ClearMidiShortcutButtonCommands();
+    void TriggerManualTransportFlash(int color_index);
+    void StopManualTransportFlash();
     void ApplySDRoutingNoDialog();
     
     // Callbacks
@@ -160,9 +167,24 @@ private:
     std::atomic<bool> auto_record_started_by_plugin_{false};
     std::atomic<bool> warning_flash_running_{false};
     std::unique_ptr<std::thread> warning_flash_thread_;
-    std::atomic<bool> manual_flash_override_{false};
     std::atomic<bool> pending_record_start_{false};
     std::atomic<bool> pending_record_stop_{false};
+    std::atomic<bool> pending_toggle_soundcheck_mode_{false};
+    std::atomic<int> pending_midi_command_{0};
+    std::atomic<bool> midi_capture_running_{false};
+    std::unique_ptr<std::thread> midi_capture_thread_;
+    std::vector<midi_Input*> midi_inputs_;
+    std::atomic<bool> manual_transport_flash_running_{false};
+    std::atomic<long long> manual_record_suppress_until_ms_{0};
+    std::atomic<long long> suppress_play_cc_until_ms_{0};
+    std::atomic<long long> suppress_record_cc_until_ms_{0};
+    std::atomic<long long> suppress_all_cc_until_ms_{0};
+    std::atomic<bool> suppress_midi_processing_{false};
+    std::unique_ptr<std::thread> manual_transport_flash_thread_;
+    std::mutex manual_transport_flash_mutex_;
+    std::atomic<long long> transport_guard_until_ms_{0};
+    std::atomic<bool> transport_guard_from_stopped_state_{false};
+    std::atomic<double> transport_guard_restore_pos_{0.0};
     std::atomic<int> layer_state_mode_{0}; // 0=idle, 1=warning, 2=recording
 };
 

@@ -10,7 +10,7 @@ When uploaded, this snap file will provide:
 
 - MIDI mappings for Wing custom buttons → REAPER actions
 - AUDIOLAB.wing.reaper.virtualsoundcheck actions (Connect, Refresh, Toggle Monitoring)
-- Transport controls (Record, Play, Stop, Pause)
+- Transport/marker controls (Play, Record, Stop, Set/Prev/Next Marker) + Virtual Soundcheck toggle
 - Optimized button layout for efficient workflow
 
 ## How to Use (Once Available)

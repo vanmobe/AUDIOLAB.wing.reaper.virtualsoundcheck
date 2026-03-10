@@ -21,7 +21,7 @@ struct WingConfig {
     std::string soundcheck_output_mode = "USB";
     
     // MIDI action mapping
-    bool configure_midi_actions = true;  // Default enabled - Wing buttons work automatically
+    bool configure_midi_actions = false;  // Default OFF; user can enable explicitly
 
     // Auto-record trigger (in REAPER, fed by Wing inputs)
     bool auto_record_enabled = false;

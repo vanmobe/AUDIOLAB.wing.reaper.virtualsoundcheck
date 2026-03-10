@@ -31,7 +31,7 @@ Platform-specific steps are in [INSTALL.md](INSTALL.md).
 
 1. Install AUDIOLAB.wing.reaper.virtualsoundcheck for your platform.
 2. Restart REAPER.
-3. Open `Extensions -> AUDIOLAB.wing.reaper.virtualsoundcheck -> Connect to Behringer Wing`.
+3. Open `Extensions -> Behringer Wing: Configure Virtual Soundcheck/Recording`.
 4. Enter your WING IP and port (default `2223`) and fetch channels.
 5. Confirm tracks are created/updated in REAPER.
 
@@ -43,6 +43,7 @@ See [QUICKSTART.md](QUICKSTART.md) for the 5-minute flow.
 - Channel metadata sync (name, color, source-related info)
 - Optional real-time monitoring for updates
 - Virtual soundcheck setup (USB/CARD routing + ALT source toggling)
+- Optional WING MIDI CC control (Play/Record/Stop/Markers/Virtual Soundcheck) with automatic button command assignment
 - Cross-platform dialog behavior:
   - macOS: native Cocoa dialogs
   - Windows/Linux: REAPER-native fallback dialogs

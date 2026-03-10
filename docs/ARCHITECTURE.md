@@ -34,11 +34,12 @@ Headers are split between:
 1. REAPER loads plugin via `REAPER_PLUGIN_ENTRYPOINT`.
 2. API function pointers are resolved.
 3. Extension singleton initializes configuration and runtime components.
-4. Custom action is registered (`Wing: Connect to Behringer Wing`).
-5. User triggers action; AUDIOLAB.wing.reaper.virtualsoundcheck dialog starts workflow.
+4. Custom action is registered (`Behringer Wing: Configure Virtual Soundcheck/Recording`).
+5. User triggers action; the Behringer Wing dialog starts workflow.
 6. OSC queries fetch channel data from WING.
 7. Track manager creates/updates REAPER tracks.
-8. Optional monitoring and virtual soundcheck actions operate from dialog controls.
+8. Optional auto-trigger and virtual soundcheck actions operate from dialog controls.
+9. Optional MIDI CC transport/marker control is handled directly by plugin MIDI hooks/capture (with WING custom-button command syncing).
 
 ## UI Strategy
 
@@ -75,3 +76,4 @@ Packaging scripts:
 - Track operations are kept separate from transport/protocol concerns.
 - Dialog and platform utilities isolate UI/platform complexity from core behavior.
 - Configuration is file-based (`config.json`) for predictable deployment.
+- WING shortcut command assignment is plugin-managed (not dependent on REAPER action-list shortcuts being reloaded at runtime).

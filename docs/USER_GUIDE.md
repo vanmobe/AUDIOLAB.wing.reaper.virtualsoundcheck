@@ -6,7 +6,7 @@ Practical guide for daily operation in REAPER with a Behringer WING.
 
 1. Restart REAPER after installing AUDIOLAB.wing.reaper.virtualsoundcheck.
 2. Confirm menu entry exists: `Extensions -> AUDIOLAB.wing.reaper.virtualsoundcheck`.
-3. Open: `Extensions -> AUDIOLAB.wing.reaper.virtualsoundcheck -> Connect to Behringer Wing`.
+3. Open: `Extensions -> Behringer Wing: Configure Virtual Soundcheck/Recording`.
 
 ![Extensions actions](images/actions-menu.png)
 
@@ -14,8 +14,8 @@ If the menu is missing, verify plugin files are in your REAPER `UserPlugins` fol
 
 ## 2. Connect to WING and Fetch Channels
 
-1. In the AUDIOLAB.wing.reaper.virtualsoundcheck dialog, enter WING IP and port.
-2. Use default port `2223` unless changed on the console.
+1. In the AUDIOLAB.wing.reaper.virtualsoundcheck dialog, use `Scan` to discover WING consoles.
+2. If scan fails, enter a manual WING IP in the fallback field.
 3. Start connect/fetch.
 4. Wait for channel discovery and track creation/update.
 
@@ -64,19 +64,20 @@ Built-in CC mapping used by AUDIOLAB.wing.reaper.virtualsoundcheck:
 
 | CC # | Action |
 |------|--------|
-| 20 | Set Marker |
-| 21 | Previous Marker |
-| 22 | Next Marker |
-| 23 | Record |
-| 24 | Stop |
-| 25 | Play |
-| 26 | Pause |
+| 20 | Play |
+| 21 | Record |
+| 22 | Toggle Virtual Soundcheck |
+| 23 | Stop (save recorded media) |
+| 24 | Set Marker |
+| 25 | Previous Marker |
+| 26 | Next Marker |
 
 Requirements:
 
 - Message type must be `MIDI CC` (not Note On)
 - MIDI channel must be channel 1
 - Button press value must be `> 0`
+- Enable `Assign MIDI shortcuts to REAPER` in the plugin window to push command bindings and labels to the selected WING layer automatically
 
 For full setup steps on WING and REAPER, see:
 

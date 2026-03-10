@@ -4,17 +4,17 @@ This guide explains how to map Behringer WING custom controls to REAPER actions 
 
 ## Fixed MIDI Mapping Used by the Plugin
 
-When `Link Reaper actions to MIDI` is enabled, the plugin listens for these exact MIDI CC messages and triggers these REAPER actions:
+When `Assign MIDI shortcuts to REAPER` is enabled, the plugin listens for these exact MIDI CC messages and triggers these REAPER actions:
 
 | CC # | REAPER Action | Command ID |
 |------|---------------|------------|
-| 20 | Markers: Insert marker at current position | 40157 |
-| 21 | Markers: Go to previous marker/project start | 40172 |
-| 22 | Markers: Go to next marker/project end | 40173 |
-| 23 | Transport: Record | 1013 |
-| 24 | Transport: Stop | 1016 |
-| 25 | Transport: Play | 1007 |
-| 26 | Transport: Pause | 1008 |
+| 20 | Transport: Play | 1007 |
+| 21 | Transport: Record | 1013 |
+| 22 | AUDIOLAB.wing.reaper.virtualsoundcheck: Toggle Virtual Soundcheck | (custom command) |
+| 23 | Transport: Stop (save all recorded media) | 40667 |
+| 24 | Markers: Insert marker at current position | 40157 |
+| 25 | Markers: Go to previous marker/project start | 40172 |
+| 26 | Markers: Go to next marker/project end | 40173 |
 
 MIDI message requirements:
 
@@ -38,9 +38,9 @@ On WING:
 2. Enable WING MIDI input device.
 3. Enable input for control messages.
 
-## 3. Map Actions in REAPER
+## 3. Mapping Behavior
 
-By default, AUDIOLAB.wing.reaper.virtualsoundcheck writes these shortcuts automatically when `Link Reaper actions to MIDI` is ON in the plugin dialog.
+By default, AUDIOLAB.wing.reaper.virtualsoundcheck handles these CC mappings internally and also pushes matching MIDI command assignments to WING custom buttons when `Assign MIDI shortcuts to REAPER` is ON.
 
 If you want to map them manually:
 
@@ -57,7 +57,7 @@ If you want to map them manually:
   - verify controls are sending CC on MIDI channel 1
   - verify CC numbers are 20-26 (per mapping table)
   - verify device enabled in REAPER
-  - remap shortcut and retest
+  - disable/re-enable `Assign MIDI shortcuts to REAPER` once to re-push WING button commands
 - Wrong action triggers:
   - ensure each button uses the intended CC number from the table
   - remove duplicate shortcuts in REAPER action list

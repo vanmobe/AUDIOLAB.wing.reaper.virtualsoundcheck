@@ -131,6 +131,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
 {
     // UI Elements
     NSPopUpButton* wingDropdown;
+    NSTextField* manualIPField;
     NSButton* scanButton;
     NSMutableArray* discoveredIPs;
     NSTextField* statusLabel;
@@ -153,7 +154,6 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     NSTextField* oscHostField;
     NSTextField* oscPortField;
     NSTextField* meterPreviewLabel;
-    NSButton* ccFlashTestButton;
     NSPopUpButton* ccLayerDropdown;
     NSTimer* meterPreviewTimer;
     
@@ -168,6 +168,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
 - (void)updateConnectionStatus;
 - (void)updateToggleSoundcheckButtonLabel;
 - (void)updateSetupSoundcheckButtonLabel;
+- (void)updateAutoTriggerControlsEnabled;
 - (void)refreshLiveSetupValidation;
 - (void)appendToLog:(NSString*)message;
 - (void)setWorkingState:(BOOL)working;
@@ -178,6 +179,8 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
 - (void)onScanClicked:(id)sender;
 - (void)onConnectClicked:(id)sender;
 - (NSString*)selectedWingIP;
+- (NSString*)selectedOrManualWingIP;
+- (void)onManualIPChanged:(id)sender;
 
 - (void)onSetupSoundcheckClicked:(id)sender;
 - (void)onToggleSoundcheckClicked:(id)sender;
@@ -188,7 +191,6 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
 - (void)onMonitorTrackChanged:(id)sender;
 - (void)persistConfigAndLog:(NSString*)message;
 - (void)onMeterPreviewTimer:(NSTimer*)timer;
-- (void)onCcFlashTest:(id)sender;
 
 - (void)runSetupSoundcheckFlow;
 - (void)runToggleSoundcheckModeFlow;
@@ -228,13 +230,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     [self setupUI];
     [self updateConnectionStatus];
     
-    // NOW we can use appendToLog
-    [self appendToLog:@"════════════════════════════════════════════════════════════════\n"];
-    [self appendToLog:@"🔧 DIALOG INIT COMPLETE - Widget setup done\n"];
-    [self appendToLog:@"════════════════════════════════════════════════════════════════\n"];
-    
-    // Set up log callback to capture C++ Log() calls  
-    [self appendToLog:@"🔧 Setting up C++ log callback...\n"];
+    // Set up log callback to capture C++ Log() calls
     auto log_lambda = [self](const std::string& msg) {
         NSString* nsMsg = [NSString stringWithUTF8String:msg.c_str()];
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -242,10 +238,8 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
         });
     };
     ReaperExtension::Instance().SetLogCallback(log_lambda);
-    [self appendToLog:@"✓ C++ log callback registered successfully\n"];
     
     [self appendToLog:@"\nScanning network for Wing consoles...\n"];
-    [self appendToLog:@"════════════════════════════════════════════════════════════════\n"];
     
     // Auto-scan for Wings on the network
     [self startDiscoveryScan];
@@ -262,6 +256,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     [discoveredIPs release];
     // Release UI elements that we retain in instance variables
     [wingDropdown release];
+    [manualIPField release];
     [scanButton release];
     [statusLabel release];
     [setupSoundcheckButton release];
@@ -283,7 +278,6 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     [oscHostField release];
     [oscPortField release];
     [meterPreviewLabel release];
-    [ccFlashTestButton release];
     [ccLayerDropdown release];
     [meterPreviewTimer invalidate];
     [meterPreviewTimer release];
@@ -354,7 +348,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     [consoleLabel setTextColor:[NSColor secondaryLabelColor]];
     [contentView addSubview:consoleLabel];
     
-    wingDropdown = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(130, yPos - 3, 410, 28) pullsDown:NO];
+    wingDropdown = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(130, yPos - 3, 420, 28) pullsDown:NO];
     [wingDropdown addItemWithTitle:@"Scanning..."];
     [[wingDropdown itemAtIndex:0] setEnabled:NO];
     [wingDropdown setEnabled:NO];
@@ -362,12 +356,35 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     [wingDropdown setAction:@selector(onWingDropdownChanged:)];
     [contentView addSubview:wingDropdown];
     
-    scanButton = [[NSButton alloc] initWithFrame:NSMakeRect(550, yPos - 1, 130, 28)];
+    scanButton = [[NSButton alloc] initWithFrame:NSMakeRect(560, yPos - 1, 120, 28)];
     [scanButton setTitle:@"Scan"];
     [scanButton setBezelStyle:NSBezelStyleRounded];
     [scanButton setTarget:self];
     [scanButton setAction:@selector(onScanClicked:)];
     [contentView addSubview:scanButton];
+
+    yPos -= 34;
+
+    NSTextField* manualIPLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(20, yPos, 110, 20)];
+    [manualIPLabel setStringValue:@"Manual IP:"];
+    [manualIPLabel setFont:[NSFont systemFontOfSize:12]];
+    [manualIPLabel setBezeled:NO];
+    [manualIPLabel setEditable:NO];
+    [manualIPLabel setSelectable:NO];
+    [manualIPLabel setBackgroundColor:[NSColor clearColor]];
+    [manualIPLabel setTextColor:[NSColor secondaryLabelColor]];
+    [contentView addSubview:manualIPLabel];
+
+    manualIPField = [[NSTextField alloc] initWithFrame:NSMakeRect(130, yPos - 3, 260, 24)];
+    auto& config = ReaperExtension::Instance().GetConfig();
+    if (!config.wing_ip.empty()) {
+        [manualIPField setStringValue:[NSString stringWithUTF8String:config.wing_ip.c_str()]];
+    }
+    [manualIPField setPlaceholderString:@"Use this if scan does not find your Wing"];
+    [manualIPField setFont:[NSFont systemFontOfSize:11]];
+    [manualIPField setTarget:self];
+    [manualIPField setAction:@selector(onManualIPChanged:)];
+    [contentView addSubview:manualIPField];
     yPos -= 36;
     
     // Status and Connect Button in same section
@@ -405,9 +422,14 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     [actionsHeader setTextColor:[NSColor labelColor]];
     [contentView addSubview:actionsHeader];
     yPos -= 35;
+
+    const CGFloat labelX = 20;
+    const CGFloat controlX = 210;
+    const CGFloat labelW = 180;
+    auto& cfg = ReaperExtension::Instance().GetConfig();
     
     // Output Mode Selector (USB/CARD)
-    NSTextField* outputModeLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(20, yPos + 8, 150, 20)];
+    NSTextField* outputModeLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(labelX, yPos + 8, labelW, 20)];
     [outputModeLabel setStringValue:@"Send sources to:"];
     [outputModeLabel setFont:[NSFont systemFontOfSize:11]];
     [outputModeLabel setBezeled:NO];
@@ -416,7 +438,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     [outputModeLabel setBackgroundColor:[NSColor clearColor]];
     [contentView addSubview:outputModeLabel];
     
-    outputModeControl = [[NSSegmentedControl alloc] initWithFrame:NSMakeRect(160, yPos + 4, 120, 24)];
+    outputModeControl = [[NSSegmentedControl alloc] initWithFrame:NSMakeRect(controlX, yPos + 4, 120, 24)];
     [outputModeControl setSegmentCount:2];
     [outputModeControl setLabel:@"USB" forSegment:0];
     [outputModeControl setLabel:@"CARD" forSegment:1];
@@ -426,52 +448,28 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     [outputModeControl setAction:@selector(onOutputModeChanged:)];
     [contentView addSubview:outputModeControl];
     yPos -= 32;
-    
-    // Wing Button Actions Toggle
-    NSTextField* midiActionsLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(20, yPos + 8, 150, 20)];
-    [midiActionsLabel setStringValue:@"Link Reaper actions to MIDI:"];
-    [midiActionsLabel setFont:[NSFont systemFontOfSize:11]];
-    [midiActionsLabel setBezeled:NO];
-    [midiActionsLabel setEditable:NO];
-    [midiActionsLabel setSelectable:NO];
-    [midiActionsLabel setBackgroundColor:[NSColor clearColor]];
-    [contentView addSubview:midiActionsLabel];
-    
-    midiActionsControl = [[NSSegmentedControl alloc] initWithFrame:NSMakeRect(160, yPos + 4, 120, 24)];
-    [midiActionsControl setSegmentCount:2];
-    [midiActionsControl setLabel:@"OFF" forSegment:0];
-    [midiActionsControl setLabel:@"ON" forSegment:1];
-    // Check if MIDI is truly enabled: config must be true AND shortcuts must exist
-    auto& ext = ReaperExtension::Instance();
-    BOOL midiFullyEnabled = ext.IsMidiActionsEnabled() && ext.AreMidiShortcutsRegistered();
-    [midiActionsControl setSelectedSegment:midiFullyEnabled ? 1 : 0];
-    [midiActionsControl setSegmentStyle:NSSegmentStyleRounded];
-    [midiActionsControl setTarget:self];
-    [midiActionsControl setAction:@selector(onMidiActionsToggled:)];
-    [contentView addSubview:midiActionsControl];
-    yPos -= 32;
 
-    // Setup Live Recording Button (Actions section)
-    setupSoundcheckButton = [[NSButton alloc] initWithFrame:NSMakeRect(20, yPos, 200, 32)];
+    // Setup Live Recording Button (place directly under output mode selector)
+    setupSoundcheckButton = [[NSButton alloc] initWithFrame:NSMakeRect(controlX, yPos, 200, 32)];
     [setupSoundcheckButton setBezelStyle:NSBezelStyleRounded];
     [setupSoundcheckButton setTitle:@"Setup Live Recording"];
     [setupSoundcheckButton setTarget:self];
     [setupSoundcheckButton setAction:@selector(onSetupSoundcheckClicked:)];
     [contentView addSubview:setupSoundcheckButton];
 
-    setupSoundcheckDescriptionLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(230, yPos + 8, 450, 20)];
+    setupSoundcheckDescriptionLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(labelX, yPos + 8, labelW, 20)];
     [setupSoundcheckDescriptionLabel setStringValue:@"Configure live recording tracks and routing"];
     [setupSoundcheckDescriptionLabel setFont:[NSFont systemFontOfSize:11]];
     [setupSoundcheckDescriptionLabel setBezeled:NO];
     [setupSoundcheckDescriptionLabel setEditable:NO];
     [setupSoundcheckDescriptionLabel setSelectable:NO];
     [setupSoundcheckDescriptionLabel setBackgroundColor:[NSColor clearColor]];
-    [setupSoundcheckDescriptionLabel setTextColor:[NSColor secondaryLabelColor]];
+    [setupSoundcheckDescriptionLabel setTextColor:[NSColor labelColor]];
     [contentView addSubview:setupSoundcheckDescriptionLabel];
     yPos -= 42;
 
-    // Toggle Soundcheck Button (Actions section)
-    toggleSoundcheckButton = [[NSButton alloc] initWithFrame:NSMakeRect(20, yPos, 200, 32)];
+    // Toggle Soundcheck Button
+    toggleSoundcheckButton = [[NSButton alloc] initWithFrame:NSMakeRect(controlX, yPos, 200, 32)];
     [toggleSoundcheckButton setBezelStyle:NSBezelStyleRounded];
     [toggleSoundcheckButton setTitle:@"🎙️ Live Mode"];
     [toggleSoundcheckButton setTarget:self];
@@ -479,18 +477,68 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     [toggleSoundcheckButton setEnabled:NO];  // Disabled until setup is complete
     [contentView addSubview:toggleSoundcheckButton];
 
-    NSTextField* toggleDesc = [[NSTextField alloc] initWithFrame:NSMakeRect(230, yPos + 8, 450, 20)];
+    NSTextField* toggleDesc = [[NSTextField alloc] initWithFrame:NSMakeRect(labelX, yPos + 8, labelW, 20)];
     [toggleDesc setStringValue:@"Toggle between live and soundcheck modes (requires setup first)"];
     [toggleDesc setFont:[NSFont systemFontOfSize:11]];
     [toggleDesc setBezeled:NO];
     [toggleDesc setEditable:NO];
     [toggleDesc setSelectable:NO];
     [toggleDesc setBackgroundColor:[NSColor clearColor]];
-    [toggleDesc setTextColor:[NSColor secondaryLabelColor]];
+    [toggleDesc setTextColor:[NSColor labelColor]];
     [contentView addSubview:toggleDesc];
     yPos -= 44;
 
-    auto& cfg = ReaperExtension::Instance().GetConfig();
+    NSTextField* ccLayerLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(labelX, yPos + 8, labelW, 20)];
+    [ccLayerLabel setStringValue:@"CC layer:"];
+    [ccLayerLabel setFont:[NSFont systemFontOfSize:11]];
+    [ccLayerLabel setBezeled:NO];
+    [ccLayerLabel setEditable:NO];
+    [ccLayerLabel setSelectable:NO];
+    [ccLayerLabel setBackgroundColor:[NSColor clearColor]];
+    [contentView addSubview:ccLayerLabel];
+
+    ccLayerDropdown = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(controlX, yPos + 4, 140, 24) pullsDown:NO];
+    for (int i = 1; i <= 16; ++i) {
+        NSString* title = [NSString stringWithFormat:@"Layer %d", i];
+        [ccLayerDropdown addItemWithTitle:title];
+        [[ccLayerDropdown itemAtIndex:i - 1] setTag:i];
+    }
+    int selectedLayer = std::min(16, std::max(1, cfg.warning_flash_cc_layer));
+    [ccLayerDropdown selectItemAtIndex:selectedLayer - 1];
+    [ccLayerDropdown setTarget:self];
+    [ccLayerDropdown setAction:@selector(onAutoRecordSettingsChanged:)];
+    [contentView addSubview:ccLayerDropdown];
+    yPos -= 32;
+    
+    // Wing Button Actions Toggle
+    NSTextField* midiActionsLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(labelX, yPos + 8, labelW, 20)];
+    [midiActionsLabel setStringValue:@"Assign MIDI shortcuts to REAPER:"];
+    [midiActionsLabel setFont:[NSFont systemFontOfSize:11]];
+    [midiActionsLabel setBezeled:NO];
+    [midiActionsLabel setEditable:NO];
+    [midiActionsLabel setSelectable:NO];
+    [midiActionsLabel setBackgroundColor:[NSColor clearColor]];
+    [contentView addSubview:midiActionsLabel];
+    
+    midiActionsControl = [[NSSegmentedControl alloc] initWithFrame:NSMakeRect(controlX, yPos + 4, 120, 24)];
+    [midiActionsControl setSegmentCount:2];
+    [midiActionsControl setLabel:@"OFF" forSegment:0];
+    [midiActionsControl setLabel:@"ON" forSegment:1];
+    // Check if MIDI action control is enabled in extension state.
+    auto& ext = ReaperExtension::Instance();
+    BOOL midiFullyEnabled = ext.IsMidiActionsEnabled();
+    [midiActionsControl setSelectedSegment:midiFullyEnabled ? 1 : 0];
+    [midiActionsControl setSegmentStyle:NSSegmentStyleRounded];
+    [midiActionsControl setTarget:self];
+    [midiActionsControl setAction:@selector(onMidiActionsToggled:)];
+    [midiActionsControl setEnabled:NO];  // Enabled only after live setup validates.
+    [contentView addSubview:midiActionsControl];
+    yPos -= 32;
+
+    NSBox* actionsSubSeparator = [[NSBox alloc] initWithFrame:NSMakeRect(20, yPos + 10, 660, 1)];
+    [actionsSubSeparator setBoxType:NSBoxSeparator];
+    [contentView addSubview:actionsSubSeparator];
+    yPos -= 6;
 
     NSTextField* autoTriggerHeader = [[NSTextField alloc] initWithFrame:NSMakeRect(20, yPos, 240, 20)];
     [autoTriggerHeader setStringValue:@"Auto Trigger"];
@@ -502,7 +550,22 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     [contentView addSubview:autoTriggerHeader];
     yPos -= 30;
 
-    NSTextField* autoEnableLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(20, yPos + 8, 150, 20)];
+    NSTextField* trackLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(labelX, yPos + 8, labelW, 20)];
+    [trackLabel setStringValue:@"Monitor track:"];
+    [trackLabel setFont:[NSFont systemFontOfSize:11]];
+    [trackLabel setBezeled:NO];
+    [trackLabel setEditable:NO];
+    [trackLabel setSelectable:NO];
+    [trackLabel setBackgroundColor:[NSColor clearColor]];
+    [contentView addSubview:trackLabel];
+    monitorTrackDropdown = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(controlX, yPos + 4, 220, 24) pullsDown:NO];
+    [monitorTrackDropdown setTarget:self];
+    [monitorTrackDropdown setAction:@selector(onMonitorTrackChanged:)];
+    [contentView addSubview:monitorTrackDropdown];
+    [self refreshMonitorTrackDropdown];
+    yPos -= 32;
+
+    NSTextField* autoEnableLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(labelX, yPos + 8, labelW, 20)];
     [autoEnableLabel setStringValue:@"Enable trigger:"];
     [autoEnableLabel setFont:[NSFont systemFontOfSize:11]];
     [autoEnableLabel setBezeled:NO];
@@ -511,7 +574,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     [autoEnableLabel setBackgroundColor:[NSColor clearColor]];
     [contentView addSubview:autoEnableLabel];
 
-    autoRecordEnableControl = [[NSSegmentedControl alloc] initWithFrame:NSMakeRect(160, yPos + 4, 120, 24)];
+    autoRecordEnableControl = [[NSSegmentedControl alloc] initWithFrame:NSMakeRect(controlX, yPos + 4, 120, 24)];
     [autoRecordEnableControl setSegmentCount:2];
     [autoRecordEnableControl setLabel:@"OFF" forSegment:0];
     [autoRecordEnableControl setLabel:@"ON" forSegment:1];
@@ -521,7 +584,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     [contentView addSubview:autoRecordEnableControl];
     yPos -= 32;
 
-    NSTextField* modeLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(20, yPos + 8, 150, 20)];
+    NSTextField* modeLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(labelX, yPos + 8, labelW, 20)];
     [modeLabel setStringValue:@"Mode:"];
     [modeLabel setFont:[NSFont systemFontOfSize:11]];
     [modeLabel setBezeled:NO];
@@ -530,7 +593,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     [modeLabel setBackgroundColor:[NSColor clearColor]];
     [contentView addSubview:modeLabel];
 
-    autoRecordModeControl = [[NSSegmentedControl alloc] initWithFrame:NSMakeRect(160, yPos + 4, 220, 24)];
+    autoRecordModeControl = [[NSSegmentedControl alloc] initWithFrame:NSMakeRect(controlX, yPos + 4, 220, 24)];
     [autoRecordModeControl setSegmentCount:2];
     [autoRecordModeControl setLabel:@"WARNING" forSegment:0];
     [autoRecordModeControl setLabel:@"RECORD" forSegment:1];
@@ -540,7 +603,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     [contentView addSubview:autoRecordModeControl];
     yPos -= 32;
 
-    NSTextField* thresholdLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(20, yPos + 8, 150, 20)];
+    NSTextField* thresholdLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(labelX, yPos + 8, labelW, 20)];
     [thresholdLabel setStringValue:@"Threshold dBFS:"];
     [thresholdLabel setFont:[NSFont systemFontOfSize:11]];
     [thresholdLabel setBezeled:NO];
@@ -548,13 +611,14 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     [thresholdLabel setSelectable:NO];
     [thresholdLabel setBackgroundColor:[NSColor clearColor]];
     [contentView addSubview:thresholdLabel];
-    thresholdField = [[NSTextField alloc] initWithFrame:NSMakeRect(160, yPos + 4, 80, 24)];
+    thresholdField = [[NSTextField alloc] initWithFrame:NSMakeRect(controlX, yPos + 4, 80, 24)];
     [thresholdField setStringValue:[NSString stringWithFormat:@"%.1f", cfg.auto_record_threshold_db]];
     [thresholdField setTarget:self];
     [thresholdField setAction:@selector(onAutoRecordSettingsChanged:)];
     [contentView addSubview:thresholdField];
+    yPos -= 32;
 
-    NSTextField* holdLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(255, yPos + 8, 70, 20)];
+    NSTextField* holdLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(labelX, yPos + 8, labelW, 20)];
     [holdLabel setStringValue:@"Hold ms:"];
     [holdLabel setFont:[NSFont systemFontOfSize:11]];
     [holdLabel setBezeled:NO];
@@ -562,47 +626,11 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     [holdLabel setSelectable:NO];
     [holdLabel setBackgroundColor:[NSColor clearColor]];
     [contentView addSubview:holdLabel];
-    holdField = [[NSTextField alloc] initWithFrame:NSMakeRect(320, yPos + 4, 70, 24)];
+    holdField = [[NSTextField alloc] initWithFrame:NSMakeRect(controlX, yPos + 4, 80, 24)];
     [holdField setStringValue:[NSString stringWithFormat:@"%d", cfg.auto_record_hold_ms]];
     [holdField setTarget:self];
     [holdField setAction:@selector(onAutoRecordSettingsChanged:)];
     [contentView addSubview:holdField];
-
-    NSTextField* trackLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(405, yPos + 8, 120, 20)];
-    [trackLabel setStringValue:@"Monitor track:"];
-    [trackLabel setFont:[NSFont systemFontOfSize:11]];
-    [trackLabel setBezeled:NO];
-    [trackLabel setEditable:NO];
-    [trackLabel setSelectable:NO];
-    [trackLabel setBackgroundColor:[NSColor clearColor]];
-    [contentView addSubview:trackLabel];
-    monitorTrackDropdown = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(500, yPos + 4, 160, 24) pullsDown:NO];
-    [monitorTrackDropdown setTarget:self];
-    [monitorTrackDropdown setAction:@selector(onMonitorTrackChanged:)];
-    [contentView addSubview:monitorTrackDropdown];
-    [self refreshMonitorTrackDropdown];
-    yPos -= 32;
-
-    NSTextField* ccLayerLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(20, yPos + 8, 150, 20)];
-    [ccLayerLabel setStringValue:@"CC warning layer:"];
-    [ccLayerLabel setFont:[NSFont systemFontOfSize:11]];
-    [ccLayerLabel setBezeled:NO];
-    [ccLayerLabel setEditable:NO];
-    [ccLayerLabel setSelectable:NO];
-    [ccLayerLabel setBackgroundColor:[NSColor clearColor]];
-    [contentView addSubview:ccLayerLabel];
-
-    ccLayerDropdown = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(160, yPos + 4, 140, 24) pullsDown:NO];
-    for (int i = 1; i <= 16; ++i) {
-        NSString* title = [NSString stringWithFormat:@"Layer %d", i];
-        [ccLayerDropdown addItemWithTitle:title];
-        [[ccLayerDropdown itemAtIndex:i - 1] setTag:i];
-    }
-    int selectedLayer = std::min(16, std::max(1, cfg.warning_flash_cc_layer));
-    [ccLayerDropdown selectItemAtIndex:selectedLayer - 1];
-    [ccLayerDropdown setTarget:self];
-    [ccLayerDropdown setAction:@selector(onAutoRecordSettingsChanged:)];
-    [contentView addSubview:ccLayerDropdown];
     yPos -= 32;
 
     yPos -= 4;
@@ -650,13 +678,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     [meterPreviewLabel setBackgroundColor:[NSColor clearColor]];
     [contentView addSubview:meterPreviewLabel];
 
-    ccFlashTestButton = [[NSButton alloc] initWithFrame:NSMakeRect(340, yPos + 2, 140, 24)];
-    [ccFlashTestButton setTitle:@"Test CC Flash"];
-    [ccFlashTestButton setBezelStyle:NSBezelStyleRounded];
-    [ccFlashTestButton setTarget:self];
-    [ccFlashTestButton setAction:@selector(onCcFlashTest:)];
-    [contentView addSubview:ccFlashTestButton];
-    yPos -= 34;
+    yPos -= 10;
     
     // ===== ACTIVITY LOG =====
     NSBox* separator2 = [[NSBox alloc] initWithFrame:NSMakeRect(20, yPos, 660, 1)];
@@ -714,6 +736,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     }
     [self updateToggleSoundcheckButtonLabel];
     [self updateSetupSoundcheckButtonLabel];
+    [self updateAutoTriggerControlsEnabled];
     [self refreshLiveSetupValidation];
 }
 
@@ -780,6 +803,19 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     }
 }
 
+- (void)updateAutoTriggerControlsEnabled {
+    const BOOL enabled = (liveSetupValidated && !isWorking) ? YES : NO;
+    [midiActionsControl setEnabled:enabled];
+    [monitorTrackDropdown setEnabled:enabled];
+    [autoRecordEnableControl setEnabled:enabled];
+    [autoRecordModeControl setEnabled:enabled];
+    [thresholdField setEnabled:enabled];
+    [holdField setEnabled:enabled];
+    [ccLayerDropdown setEnabled:enabled];
+    [sdAutoRecordCheckbox setEnabled:enabled];
+    [sdSourceDropdown setEnabled:enabled];
+}
+
 - (void)refreshLiveSetupValidation {
     // Never block the UI thread with network/OSC queries.
     if (validationInProgress || isWorking) {
@@ -790,7 +826,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     auto& config = extension.GetConfig();
 
     std::string candidate_ip;
-    NSString* selectedIP = [self selectedWingIP];
+    NSString* selectedIP = [self selectedOrManualWingIP];
     if (selectedIP && [selectedIP length] > 0) {
         candidate_ip = std::string([selectedIP UTF8String]);
     } else if (!config.wing_ip.empty()) {
@@ -801,6 +837,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
         liveSetupValidated = NO;
         [self updateToggleSoundcheckButtonLabel];
         [self updateSetupSoundcheckButtonLabel];
+        [self updateAutoTriggerControlsEnabled];
         [self appendToLog:@"Live setup validation: NOT READY — no Wing IP available to validate against.\n"];
         return;
     }
@@ -823,6 +860,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
                     blockSelf->liveSetupValidated = NO;
                     [blockSelf updateToggleSoundcheckButtonLabel];
                     [blockSelf updateSetupSoundcheckButtonLabel];
+                    [blockSelf updateAutoTriggerControlsEnabled];
                     [blockSelf appendToLog:[NSString stringWithFormat:@"Live setup validation: NOT READY — %s\n",
                                             details.c_str()]];
                 });
@@ -841,6 +879,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
             blockSelf->liveSetupValidated = valid ? YES : NO;
             [blockSelf updateToggleSoundcheckButtonLabel];
             [blockSelf updateSetupSoundcheckButtonLabel];
+            [blockSelf updateAutoTriggerControlsEnabled];
             [blockSelf appendToLog:[NSString stringWithFormat:@"Live setup validation: %s — %s\n",
                                     valid ? "READY" : "NOT READY",
                                     details.c_str()]];
@@ -856,11 +895,19 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     // Toggle button state depends on both working state and setup completion
     [self updateToggleSoundcheckButtonLabel];
     [self updateSetupSoundcheckButtonLabel];
+    [self updateAutoTriggerControlsEnabled];
 }
 
 - (void)appendToLog:(NSString*)message {
+    if (!message) {
+        return;
+    }
+    NSString* cleaned = [message stringByReplacingOccurrencesOfString:@"AUDIOLAB.wing.reaper.virtualsoundcheck: "
+                                                           withString:@""];
+    cleaned = [cleaned stringByReplacingOccurrencesOfString:@"AUDIOLAB.wing.reaper.virtualsoundcheck:"
+                                                 withString:@""];
     NSString* currentText = [activityLogView string];
-    NSString* newText = [currentText stringByAppendingString:message];
+    NSString* newText = [currentText stringByAppendingString:cleaned];
     [activityLogView setString:newText];
     
     // Scroll to bottom
@@ -929,6 +976,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
         // Immediately apply the first found Wing IP to config
         auto& config = ReaperExtension::Instance().GetConfig();
         config.wing_ip = std::string([[ips objectAtIndex:0] UTF8String]);
+        [manualIPField setStringValue:[ips objectAtIndex:0]];
         [self appendToLog:[NSString stringWithFormat:@"Found %d Wing console(s):\n", (int)[items count]]];
         for (NSString* title in items) {
             [self appendToLog:[NSString stringWithFormat:@"  \u2022 %@\n", title]];
@@ -942,6 +990,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     if (discoveredIPs && idx >= 0 && idx < (NSInteger)[discoveredIPs count]) {
         auto& config = ReaperExtension::Instance().GetConfig();
         config.wing_ip = std::string([[discoveredIPs objectAtIndex:idx] UTF8String]);
+        [manualIPField setStringValue:[discoveredIPs objectAtIndex:idx]];
         [self appendToLog:[NSString stringWithFormat:@"Selected Wing: %@\n",
                           [wingDropdown titleOfSelectedItem]]];
     }
@@ -973,7 +1022,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
             return;
         }
 
-        NSString* wingIP = [blockSelf selectedWingIP];
+        NSString* wingIP = [blockSelf selectedOrManualWingIP];
         if (wingIP && [wingIP length] > 0) {
             config.wing_ip = std::string([wingIP UTF8String]);
         }
@@ -1008,8 +1057,6 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
 
 - (NSString*)selectedWingIP {
     if (!wingDropdown || !discoveredIPs) {
-        fprintf(stderr, "[WING] ERROR: selectedWingIP called but UI not initialized (wingDropdown=%p, discoveredIPs=%p)\n", 
-                wingDropdown, discoveredIPs);
         return nil;
     }
     NSInteger idx = [wingDropdown indexOfSelectedItem];
@@ -1017,6 +1064,37 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
         return [discoveredIPs objectAtIndex:idx];
     }
     return nil;
+}
+
+- (NSString*)selectedOrManualWingIP {
+    NSString* selected = [self selectedWingIP];
+    if (selected && [selected length] > 0) {
+        return selected;
+    }
+    if (manualIPField) {
+        NSString* typed = [[manualIPField stringValue]
+            stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if ([typed length] > 0) {
+            return typed;
+        }
+    }
+    return nil;
+}
+
+- (void)onManualIPChanged:(id)sender {
+    (void)sender;
+    if (!manualIPField) {
+        return;
+    }
+    NSString* typed = [[manualIPField stringValue]
+        stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    auto& config = ReaperExtension::Instance().GetConfig();
+    config.wing_ip = ([typed length] > 0) ? std::string([typed UTF8String]) : std::string();
+    if ([typed length] > 0) {
+        [self appendToLog:[NSString stringWithFormat:@"Manual Wing IP set to %@\n", typed]];
+    }
+    [self persistConfigAndLog:nil];
+    [self refreshLiveSetupValidation];
 }
 
 - (void)onSetupSoundcheckClicked:(id)sender {
@@ -1077,22 +1155,19 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
 }
 
 - (void)onMidiActionsToggled:(id)sender {
+    if (!liveSetupValidated) {
+        [midiActionsControl setSelectedSegment:0];
+        [self appendToLog:@"Configure live setup first before enabling MIDI shortcuts.\n"];
+        return;
+    }
+
     auto& extension = ReaperExtension::Instance();
     BOOL enabled = ([midiActionsControl selectedSegment] == 1);
     
     if (enabled) {
-        // When enabling, always force registration to ensure shortcuts are written
         extension.EnableMidiActions(true);
-        
-        // Verify it actually worked
-        if (!extension.AreMidiShortcutsRegistered()) {
-            [self appendToLog:@"⚠️ Warning: MIDI shortcuts may not have been registered correctly\n"];
-            [midiActionsControl setSelectedSegment:0];
-        } else {
-            [self appendToLog:@"✓ MIDI actions enabled - Wing buttons now control REAPER\n"];
-        }
+        [self appendToLog:@"✓ MIDI actions enabled - Wing buttons now control REAPER\n"];
     } else {
-        // When disabling, remove shortcuts
         extension.EnableMidiActions(false);
         [self appendToLog:@"MIDI actions disabled\n"];
     }
@@ -1128,6 +1203,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     config.sd_lr_left_input = sdLeft;
     config.sd_lr_right_input = sdLeft + 1;
     ReaperExtension::Instance().ApplyAutoRecordSettings();
+    ReaperExtension::Instance().SyncMidiActionsToWing();
 
     [self appendToLog:[NSString stringWithFormat:@"Auto trigger: %s, mode=%s, source=REAPER, threshold=%.1f dBFS, hold=%dms, track=%d, ccLayer=%d\n",
                        config.auto_record_enabled ? "ON" : "OFF",
@@ -1151,41 +1227,25 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
     [meterPreviewLabel setStringValue:[NSString stringWithFormat:@"Trigger level: %.1f dBFS", db]];
 }
 
-- (void)onCcFlashTest:(id)sender {
-    (void)sender;
-    [ccFlashTestButton setEnabled:NO];
-    [ccFlashTestButton setTitle:@"Flashing..."];
-    ReaperExtension::Instance().TestWarningFlash();
-    [self appendToLog:@"Manual test: CC flash requested\n"];
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
-        [ccFlashTestButton setEnabled:YES];
-        [ccFlashTestButton setTitle:@"Test CC Flash"];
-    });
-}
-
 - (void)runSetupSoundcheckFlow {
     // Capture UI values on the main thread before dispatching
-    NSString* wingIP = [self selectedWingIP];
+    NSString* wingIP = [self selectedOrManualWingIP];
     WingConnectorWindowController* blockSelf = self;
 
-    fprintf(stderr, "[WING] runSetupSoundcheckFlow: Starting background thread. wingIP=%s\n", 
-            wingIP ? [wingIP UTF8String] : "nil");
-    fflush(stderr);
-
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        fprintf(stderr, "[WING] Background thread started\n"); fflush(stderr);
-        
         auto& extension = ReaperExtension::Instance();
-        fprintf(stderr, "[WING] Got extension instance\n"); fflush(stderr);
+
+        // Prevent auto-record from starting transport while setup is being configured.
+        extension.PauseAutoRecordForSetup();
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [blockSelf appendToLog:@"Auto-trigger paused during setup configuration.\n"];
+        });
 
         if (!extension.IsConnected()) {
-            fprintf(stderr, "[WING] Not connected, attempting auto-connect\n"); fflush(stderr);
             dispatch_async(dispatch_get_main_queue(), ^{ [blockSelf appendToLog:@"Not connected — attempting to connect automatically...\n"]; });
             if (!wingIP) {
-                fprintf(stderr, "[WING] ERROR: No Wing IP selected\n"); fflush(stderr);
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    [blockSelf appendToLog:@"✗ No Wing selected. Press Scan to find Wing consoles on the network.\n"];
+                    [blockSelf appendToLog:@"✗ No Wing selected. Press Scan or enter a manual IP.\n"];
                     [blockSelf setWorkingState:NO];
                     [blockSelf updateConnectionStatus];
                 });
@@ -1193,9 +1253,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
             }
             auto& config = extension.GetConfig();
             config.wing_ip = std::string([wingIP UTF8String]);
-            fprintf(stderr, "[WING] Connecting to %s:2223...\n", config.wing_ip.c_str()); fflush(stderr);
             if (!extension.ConnectToWing()) {
-                fprintf(stderr, "[WING] ERROR: ConnectToWing failed\n"); fflush(stderr);
                 dispatch_async(dispatch_get_main_queue(), ^{
                     [blockSelf appendToLog:@"✗ Auto-connect failed. Check that the Wing is reachable.\n"];
                     [blockSelf setWorkingState:NO];
@@ -1203,23 +1261,16 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
                 });
                 return;
             }
-            fprintf(stderr, "[WING] Connected successfully\n"); fflush(stderr);
             dispatch_async(dispatch_get_main_queue(), ^{
                 [blockSelf appendToLog:@"✓ Auto-connected to Wing\n"];
                 [blockSelf updateConnectionStatus];
             });
-        } else {
-            fprintf(stderr, "[WING] Already connected\n"); fflush(stderr);
         }
 
         dispatch_async(dispatch_get_main_queue(), ^{ [blockSelf appendToLog:@"Getting Wing channels for live recording setup...\n"]; });
-        fprintf(stderr, "[WING] Calling GetAvailableChannels...\n"); fflush(stderr);
-
         auto channels = extension.GetAvailableChannels();
-        fprintf(stderr, "[WING] GetAvailableChannels returned %zu channels\n", channels.size()); fflush(stderr);
         
         if (channels.empty()) {
-            fprintf(stderr, "[WING] ERROR: No channels found\n"); fflush(stderr);
             dispatch_async(dispatch_get_main_queue(), ^{
                 [blockSelf appendToLog:@"✗ No channels with sources found.\n"];
                 [blockSelf setWorkingState:NO];
@@ -1230,21 +1281,17 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
         __block auto blockChannels = channels;
         __block bool confirmed = false;
         __block bool setup_soundcheck = true;  // Will be set by dialog
-        fprintf(stderr, "[WING] Showing channel selection dialog on main thread...\n"); fflush(stderr);
         dispatch_sync(dispatch_get_main_queue(), ^{
             [blockSelf appendToLog:[NSString stringWithFormat:@"Found %d channels with sources\n", (int)blockChannels.size()]];
-            fprintf(stderr, "[WING] Calling ShowChannelSelectionDialog...\n"); fflush(stderr);
             confirmed = ShowChannelSelectionDialog(
                 blockChannels,
                 "Select Channels for Virtual Soundcheck",
                 "Choose which channels to configure for virtual soundcheck.",
                 setup_soundcheck
             );
-            fprintf(stderr, "[WING] Dialog returned, confirmed=%d, setup_soundcheck=%d\n", confirmed, setup_soundcheck); fflush(stderr);
         });
 
         if (!confirmed) {
-            fprintf(stderr, "[WING] User cancelled\n"); fflush(stderr);
             dispatch_async(dispatch_get_main_queue(), ^{
                 [blockSelf appendToLog:@"Cancelled by user\n"];
                 [blockSelf setWorkingState:NO];
@@ -1256,10 +1303,8 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
         for (const auto& ch : blockChannels) {
             if (ch.selected) selectedCount++;
         }
-        fprintf(stderr, "[WING] %d channels selected\n", selectedCount); fflush(stderr);
 
         if (selectedCount == 0) {
-            fprintf(stderr, "[WING] ERROR: No channels selected\n"); fflush(stderr);
             dispatch_async(dispatch_get_main_queue(), ^{
                 [blockSelf appendToLog:@"✗ No channels selected\n"];
                 [blockSelf setWorkingState:NO];
@@ -1267,24 +1312,20 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
             return;
         }
 
-        fprintf(stderr, "[WING] Setting up live recording on main thread...\n"); fflush(stderr);
         dispatch_sync(dispatch_get_main_queue(), ^{
             [blockSelf appendToLog:[NSString stringWithFormat:@"Setting up live recording for %d channels...\n", selectedCount]];
-            fprintf(stderr, "[WING] Calling SetupSoundcheckFromSelection (setup_soundcheck=%d)...\n", setup_soundcheck); fflush(stderr);
             extension.SetupSoundcheckFromSelection(blockChannels, setup_soundcheck);
-            fprintf(stderr, "[WING] SetupSoundcheckFromSelection complete\n"); fflush(stderr);
             [blockSelf appendToLog:@"✓ Live recording setup complete\n"];
             [blockSelf refreshMonitorTrackDropdown];
             [blockSelf setWorkingState:NO];
             [blockSelf refreshLiveSetupValidation];
         });
-        fprintf(stderr, "[WING] runSetupSoundcheckFlow complete\n"); fflush(stderr);
     });
 }
 
 - (void)runToggleSoundcheckModeFlow {
     // Capture UI values on the main thread before dispatching
-    NSString* wingIP = [self selectedWingIP];
+    NSString* wingIP = [self selectedOrManualWingIP];
     WingConnectorWindowController* blockSelf = self;
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
@@ -1294,7 +1335,7 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
             dispatch_async(dispatch_get_main_queue(), ^{ [blockSelf appendToLog:@"Not connected — attempting to connect automatically...\n"]; });
             if (!wingIP) {
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    [blockSelf appendToLog:@"✗ No Wing selected. Press Scan to find Wing consoles on the network.\n"];
+                    [blockSelf appendToLog:@"✗ No Wing selected. Press Scan or enter a manual IP.\n"];
                     [blockSelf setWorkingState:NO];
                     [blockSelf updateConnectionStatus];
                 });
@@ -1340,19 +1381,12 @@ bool ShowChannelSelectionDialog(std::vector<WingConnector::ChannelSelectionInfo>
 extern "C" {
 
 void ShowWingConnectorDialog() {
-    // Write debug output to system stderr (visible in REAPER console)
-    fprintf(stderr, "\n🔧 [WING] ShowWingConnectorDialog() called\n");
-    fflush(stderr);
-    
     // Static to keep controller alive in MRC - window doesn't retain it by default
     static WingConnectorWindowController* controller = nil;
     
     // Must run UI operations on main thread
     dispatch_async(dispatch_get_main_queue(), ^{
         // NO @autoreleasepool here - it would drain objects that need to live longer
-        fprintf(stderr, "🔧 [WING] Creating WingConnectorWindowController\n");
-        fflush(stderr);
-        
         // If window already exists and is visible, just bring it to front
         if (controller && [[controller window] isVisible]) {
             [[controller window] makeKeyAndOrderFront:nil];
@@ -1364,16 +1398,8 @@ void ShowWingConnectorDialog() {
             [controller release];
         }
         controller = [[WingConnectorWindowController alloc] init];
-        
-        fprintf(stderr, "🔧 [WING] Showing window\n");
-        fflush(stderr);
-        
+
         [[controller window] makeKeyAndOrderFront:nil];
-        
-        fprintf(stderr, "🔧 [WING] Appending init message\n");
-        fflush(stderr);
-        
-        [controller appendToLog:@"🔧 Window initialization complete\n"];
     });
 }
 

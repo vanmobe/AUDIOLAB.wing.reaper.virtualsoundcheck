@@ -64,7 +64,7 @@ Default plugin path:
 
 ## First Run
 
-1. Go to `Extensions -> AUDIOLAB.wing.reaper.virtualsoundcheck -> Connect to Behringer Wing`.
+1. Go to `Extensions -> Behringer Wing: Configure Virtual Soundcheck/Recording`.
 2. Set WING IP and port (default `2223`).
 3. Fetch channels and confirm track creation.
 

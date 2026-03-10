@@ -1043,6 +1043,25 @@ void WingOSC::SetUserControlColor(int layer, int button, int color_index) {
     SendRawPacket(p.Data(), p.Size());
 }
 
+void WingOSC::SetUserControlButtonLed(int layer, int button, bool on, bool lower_row) {
+    if (layer <= 0 || button <= 0) {
+        return;
+    }
+    const char* slot = lower_row ? "bd" : "bu";
+    char buffer[256];
+    osc::OutboundPacketStream p(buffer, 256);
+    const std::string addr_a = "/$ctl/user/" + std::to_string(layer) + "/" +
+                               std::to_string(button) + "/" + slot + "/led";
+    p << MakeOscBeginToken(addr_a.c_str()) << (int32_t)(on ? 1 : 0) << MakeOscEndToken();
+    SendRawPacket(p.Data(), p.Size());
+
+    p.Clear();
+    const std::string addr_b = "/$ctl/user/" + std::to_string(layer) + "/" +
+                               std::to_string(button) + "/" + slot + "/config/led";
+    p << MakeOscBeginToken(addr_b.c_str()) << (int32_t)(on ? 1 : 0) << MakeOscEndToken();
+    SendRawPacket(p.Data(), p.Size());
+}
+
 void WingOSC::SetActiveUserControlLayer(int layer) {
     if (layer <= 0) {
         return;
@@ -1065,46 +1084,80 @@ void WingOSC::SetUserControlRotaryName(int layer, int rotary, const std::string&
     if (layer <= 0 || rotary <= 0) {
         return;
     }
-    const std::vector<int> layer_candidates = {layer, std::max(0, layer - 1)};
-    const std::vector<int> rotary_candidates = {rotary};
-    for (int ly : layer_candidates) {
-        for (int ry : rotary_candidates) {
-            const std::vector<std::string> paths = {
-                "/$ctl/user/" + std::to_string(ly) + "/" + std::to_string(ry) + "/enc/name",
-                "/$ctl/user/" + std::to_string(ly) + "/" + std::to_string(ry) + "/enc/$fname",
-                "/$ctl/user/" + std::to_string(ly) + "/rot/" + std::to_string(ry) + "/name",
-                "/$ctl/user/" + std::to_string(ly) + "/rotary/" + std::to_string(ry) + "/name",
-                "/$ctl/user/" + std::to_string(ly) + "/enc/" + std::to_string(ry) + "/name",
-                "/$ctl/user/" + std::to_string(ly) + "/knob/" + std::to_string(ry) + "/name",
-                "/$ctl/user/" + std::to_string(ly) + "/" + std::to_string(ry) + "/name",
-                "/$ctl/user/" + std::to_string(ly) + "/rot/" + std::to_string(ry) + "/txt",
-                "/$ctl/user/" + std::to_string(ly) + "/rotary/" + std::to_string(ry) + "/txt",
-                "/$ctl/user/" + std::to_string(ly) + "/enc/" + std::to_string(ry) + "/txt",
-                "/$ctl/user/" + std::to_string(ly) + "/knob/" + std::to_string(ry) + "/txt",
-                "/$ctl/user/" + std::to_string(ly) + "/" + std::to_string(ry) + "/txt",
-                "/$ctl/user/" + std::to_string(ly) + "/rot/" + std::to_string(ry) + "/label",
-                "/$ctl/user/" + std::to_string(ly) + "/rotary/" + std::to_string(ry) + "/label",
-                "/$ctl/user/" + std::to_string(ly) + "/enc/" + std::to_string(ry) + "/label",
-                "/$ctl/user/" + std::to_string(ly) + "/knob/" + std::to_string(ry) + "/label",
-                "/$ctl/user/" + std::to_string(ly) + "/" + std::to_string(ry) + "/label",
-                "/$ctl/user/" + std::to_string(ly) + "/rot/" + std::to_string(ry) + "/config/name",
-                "/$ctl/user/" + std::to_string(ly) + "/rotary/" + std::to_string(ry) + "/config/name",
-                "/$ctl/user/" + std::to_string(ly) + "/enc/" + std::to_string(ry) + "/config/name",
-                "/$ctl/user/" + std::to_string(ly) + "/knob/" + std::to_string(ry) + "/config/name",
-                "/$ctl/user/" + std::to_string(ly) + "/" + std::to_string(ry) + "/config/name"
-            };
-            for (const auto& path : paths) {
-                char buffer[256];
-                osc::OutboundPacketStream p(buffer, 256);
-                p << MakeOscBeginToken(path.c_str()) << name.c_str() << MakeOscEndToken();
-                SendRawPacket(p.Data(), p.Size());
+    const std::string path = "/$ctl/user/" + std::to_string(layer) + "/" +
+                             std::to_string(rotary) + "/enc/name";
+    char buffer[256];
+    osc::OutboundPacketStream p(buffer, 256);
+    p << MakeOscBeginToken(path.c_str()) << name.c_str() << MakeOscEndToken();
+    SendRawPacket(p.Data(), p.Size());
+}
 
-                p.Clear();
-                p << MakeOscBeginToken(path.c_str()) << name.c_str() << 0.0f << (int32_t)0 << MakeOscEndToken();
-                SendRawPacket(p.Data(), p.Size());
-            }
-        }
+void WingOSC::SetUserControlButtonName(int layer, int button, const std::string& name, bool lower_row) {
+    if (layer <= 0 || button <= 0) {
+        return;
     }
+    const char* slot = lower_row ? "bd" : "bu";
+    const std::string path = "/$ctl/user/" + std::to_string(layer) + "/" +
+                             std::to_string(button) + "/" + slot + "/name";
+    char buffer[256];
+    osc::OutboundPacketStream p(buffer, 256);
+    p << MakeOscBeginToken(path.c_str()) << name.c_str() << MakeOscEndToken();
+    SendRawPacket(p.Data(), p.Size());
+}
+
+void WingOSC::SetUserControlButtonMidiCCToggle(int layer, int button, int midi_channel, int cc_number, int value, bool lower_row, bool toggle_mode) {
+    if (layer <= 0 || button <= 0) {
+        return;
+    }
+    midi_channel = std::max(1, std::min(16, midi_channel));
+    cc_number = std::max(0, std::min(127, cc_number));
+    value = std::max(0, std::min(127, value));
+
+    const char* slot = lower_row ? "bd" : "bu";
+    const std::string base = "/$ctl/user/" + std::to_string(layer) + "/" + std::to_string(button) + "/" + slot;
+    char buffer[256];
+    osc::OutboundPacketStream p(buffer, 256);
+
+    p << MakeOscBeginToken((base + "/mode").c_str()) << (toggle_mode ? "MIDICCT" : "MIDICCP") << MakeOscEndToken();
+    SendRawPacket(p.Data(), p.Size());
+
+    p.Clear();
+    p << MakeOscBeginToken((base + "/ch").c_str()) << (int32_t)midi_channel << MakeOscEndToken();
+    SendRawPacket(p.Data(), p.Size());
+
+    p.Clear();
+    p << MakeOscBeginToken((base + "/cc").c_str()) << (int32_t)cc_number << MakeOscEndToken();
+    SendRawPacket(p.Data(), p.Size());
+
+    p.Clear();
+    p << MakeOscBeginToken((base + "/val").c_str()) << (int32_t)value << MakeOscEndToken();
+    SendRawPacket(p.Data(), p.Size());
+}
+
+void WingOSC::ClearUserControlButtonCommand(int layer, int button, bool lower_row) {
+    if (layer <= 0 || button <= 0) {
+        return;
+    }
+    const char* slot = lower_row ? "bd" : "bu";
+    const std::string path = "/$ctl/user/" + std::to_string(layer) + "/" + std::to_string(button) + "/" + slot + "/mode";
+    char buffer[256];
+    osc::OutboundPacketStream p(buffer, 256);
+    p << MakeOscBeginToken(path.c_str()) << "OFF" << MakeOscEndToken();
+    SendRawPacket(p.Data(), p.Size());
+}
+
+void WingOSC::SetUserControlButtonValue(int layer, int button, int value, bool lower_row) {
+    if (layer <= 0 || button <= 0) {
+        return;
+    }
+    value = std::max(0, std::min(127, value));
+    const char* slot = lower_row ? "bd" : "bu";
+    const std::string path = "/$ctl/user/" + std::to_string(layer) + "/" +
+                             std::to_string(button) + "/" + slot + "/val";
+    char buffer[256];
+    osc::OutboundPacketStream p(buffer, 256);
+    p << MakeOscBeginToken(path.c_str()) << (int32_t)value << MakeOscEndToken();
+    SendRawPacket(p.Data(), p.Size());
 }
 
 void WingOSC::QueryUserControlColor(int layer, int button) {

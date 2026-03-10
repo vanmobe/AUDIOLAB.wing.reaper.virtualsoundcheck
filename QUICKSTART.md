@@ -23,7 +23,7 @@ See [INSTALL.md](INSTALL.md) if needed.
 ## 3. Launch REAPER and Connect
 
 1. Restart REAPER after installation.
-2. Open `Extensions -> AUDIOLAB.wing.reaper.virtualsoundcheck -> Connect to Behringer Wing`.
+2. Open `Extensions -> Behringer Wing: Configure Virtual Soundcheck/Recording`.
 3. Enter the WING IP/port.
 4. Run channel fetch / connect in the dialog.
 
@@ -44,15 +44,16 @@ Inside the AUDIOLAB.wing.reaper.virtualsoundcheck dialog:
 
 Default mapping used by the plugin:
 
-- `CC 20` -> Set Marker
-- `CC 21` -> Previous Marker
-- `CC 22` -> Next Marker
-- `CC 23` -> Record
-- `CC 24` -> Stop
-- `CC 25` -> Play
-- `CC 26` -> Pause
+- `CC 20` -> Play
+- `CC 21` -> Record
+- `CC 22` -> Toggle Virtual Soundcheck
+- `CC 23` -> Stop (save recorded media)
+- `CC 24` -> Set Marker
+- `CC 25` -> Previous Marker
+- `CC 26` -> Next Marker
 
 Use `MIDI CC` on channel 1 from WING custom controls.
+When `Assign MIDI shortcuts to REAPER` is enabled in the plugin, button labels and MIDI command bindings are pushed to the selected WING layer automatically.
 
 Full setup steps:
 
@@ -79,7 +80,6 @@ UI support:
 - `Monitor track` can target a specific REAPER track (`0` = auto across armed+monitored tracks).
 - `Hold ms` keeps warning/record active briefly after drops to avoid rapid stop/start chatter.
 - Live meter preview is shown as `Trigger level` in the dialog.
-- Use `Test CC Flash` to verify the WING warning LEDs (buttons 1-4) flash correctly.
 
 ## 7. Optional: Route Main LR to SD (CARD 1/2)
 

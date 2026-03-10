@@ -156,8 +156,13 @@ public:
     void StopSDRecorder();
     void SetUserControlLed(int layer, int button, bool on);
     void SetUserControlColor(int layer, int button, int color_index);
+    void SetUserControlButtonLed(int layer, int button, bool on, bool lower_row = false);
     void SetActiveUserControlLayer(int layer);
     void SetUserControlRotaryName(int layer, int rotary, const std::string& name);
+    void SetUserControlButtonName(int layer, int button, const std::string& name, bool lower_row = false);
+    void SetUserControlButtonMidiCCToggle(int layer, int button, int midi_channel, int cc_number, int value = 0, bool lower_row = false, bool toggle_mode = false);
+    void ClearUserControlButtonCommand(int layer, int button, bool lower_row = false);
+    void SetUserControlButtonValue(int layer, int button, int value, bool lower_row = false);
     void QueryUserControlColor(int layer, int button);
     void QueryUserControlRotaryText(int layer, int rotary);
     int GetCachedUserControlColor(int layer, int button, int fallback = 2) const;

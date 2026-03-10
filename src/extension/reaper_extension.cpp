@@ -20,6 +20,7 @@
 #include <set>
 #include <ctime>
 #include <cmath>
+#include <limits>
 #ifdef _WIN32
 #include <sys/utime.h>
 // windows.h defines min/max macros that break std::min/std::max usage.
@@ -45,7 +46,14 @@ namespace WingConnector {
 namespace {
 constexpr int kChannelQueryAttempts = 2;
 constexpr int kQueryResponseWaitMs = 600;  // Wait time for OSC responses after sending all queries
+constexpr int kReaperPlayStatePlayingBit = 1;
 constexpr int kReaperPlayStateRecordingBit = 4;
+
+long long SteadyNowMs() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
 
 void SendOscMessage(const std::string& host, int port, const std::string& address, int value = 1) {
     if (host.empty() || port <= 0 || address.empty()) {
@@ -75,6 +83,38 @@ bool TouchFile(const std::string& path) {
     struct utimbuf times = {now, now};
     return utime(path.c_str(), &times) == 0;
 #endif
+}
+
+std::vector<std::string> GetReaperKeymapPaths() {
+    std::vector<std::string> paths;
+    const char* resource_path = GetResourcePath();
+    if (resource_path && *resource_path) {
+        paths.emplace_back(std::string(resource_path) + "/reaper-kb.ini");
+    }
+#ifdef __APPLE__
+    const char* home = std::getenv("HOME");
+    if (home && *home) {
+        paths.emplace_back(std::string(home) + "/Library/Application Support/REAPER/reaper-kb.ini");
+    }
+#elif defined(_WIN32)
+    const char* appdata = std::getenv("APPDATA");
+    if (appdata && *appdata) {
+        paths.emplace_back(std::string(appdata) + "/REAPER/reaper-kb.ini");
+    }
+#else
+    const char* home = std::getenv("HOME");
+    if (home && *home) {
+        paths.emplace_back(std::string(home) + "/.config/REAPER/reaper-kb.ini");
+    }
+#endif
+    // Deduplicate while preserving order.
+    std::vector<std::string> unique;
+    for (const auto& p : paths) {
+        if (std::find(unique.begin(), unique.end(), p) == unique.end()) {
+            unique.push_back(p);
+        }
+    }
+    return unique;
 }
 }  // namespace
 
@@ -156,22 +196,14 @@ bool ReaperExtension::Initialize(reaper_plugin_info_t* rec) {
     
     // Load configuration
     std::string config_path = WingConfig::GetConfigPath();
-    fprintf(stderr, "🔧 [WING] Loading config from: %s\n", config_path.c_str());
-    fflush(stderr);
     
     bool loaded_user_config = config_.LoadFromFile(config_path);
     if (!loaded_user_config) {
-        fprintf(stderr, "🔧 [WING] User config not found, trying install directory\n");
-        fflush(stderr);
         // Try loading from install directory
         if (!config_.LoadFromFile("config.json")) {
-            fprintf(stderr, "🔧 [WING] Using default configuration\n");
-            fflush(stderr);
             Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Using default configuration\n");
         }
     } else {
-        fprintf(stderr, "🔧 [WING] Configuration loaded successfully\n");
-        fflush(stderr);
         Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Configuration loaded\n");
         
         bool config_updated = false;
@@ -183,47 +215,28 @@ bool ReaperExtension::Initialize(reaper_plugin_info_t* rec) {
             Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Updated listener port to 2223\n");
         }
         
-        // Auto-enable MIDI actions if not configured
-        if (!config_.configure_midi_actions) {
-            config_.configure_midi_actions = true;
-            config_updated = true;
-            Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Auto-enabled MIDI action mapping for Wing buttons\n");
-        }
-        
         // Save updated config
-        if (config_updated && config_.SaveToFile(config_path)) {
-            fprintf(stderr, "🔧 [WING] Configuration auto-updated and saved\n");
-            fflush(stderr);
+        if (config_updated) {
+            config_.SaveToFile(config_path);
         }
     }
-    
-    fprintf(stderr, "🔧 [WING] Creating track manager\n");
-    fflush(stderr);
-    
+
     // Create track manager
     track_manager_ = std::make_unique<TrackManager>(config_);
-    
-    fprintf(stderr, "🔧 [WING] Enabling Wing MIDI device\n");
-    fflush(stderr);
-    
+
     // Enable Wing MIDI device in REAPER settings
     EnableWingMidiDevice();
-    
-    fprintf(stderr, "🔧 [WING] MIDI actions enabled: %d\n", config_.configure_midi_actions);
-    fflush(stderr);
-    
+
     // Enable MIDI actions if configured
     if (config_.configure_midi_actions) {
-        fprintf(stderr, "🔧 [WING] Enabling MIDI actions\n");
-        fflush(stderr);
         EnableMidiActions(true);
     }
-    
-    fprintf(stderr, "🔧 [WING] ReaperExtension::Initialize() complete\n");
-    fflush(stderr);
 
     if (g_rec_) {
         g_rec_->Register("timer", (void*)ReaperExtension::MainThreadTimerTick);
+        // Register MIDI input hooks so CC actions work immediately without relying on kb.ini reload timing.
+        g_rec_->Register("hook_midi_input", (void*)WingMidiInputHookWrapper);
+        g_rec_->Register("hook_midiin", (void*)WingMidiInputHookWrapper);
     }
     
     return true;
@@ -232,7 +245,11 @@ bool ReaperExtension::Initialize(reaper_plugin_info_t* rec) {
 void ReaperExtension::Shutdown() {
     if (g_rec_) {
         g_rec_->Register("-timer", (void*)ReaperExtension::MainThreadTimerTick);
+        g_rec_->Register("-hook_midi_input", (void*)WingMidiInputHookWrapper);
+        g_rec_->Register("-hook_midiin", (void*)WingMidiInputHookWrapper);
     }
+    StopManualTransportFlash();
+    StopMidiCapture();
     StopAutoRecordMonitor();
     EnableMidiActions(false);
     DisconnectFromWing();
@@ -241,16 +258,90 @@ void ReaperExtension::Shutdown() {
 
 void ReaperExtension::MainThreadTimerTick() {
     auto& ext = ReaperExtension::Instance();
+    constexpr int kCmdTransportRecord = 1013;
+    constexpr int kCmdTransportStopSaveAllRecordedMedia = 40667;
+    const long long now_ms = SteadyNowMs();
+
+    auto stop_without_rewind = [&](double forced_restore_pos = std::numeric_limits<double>::quiet_NaN()) {
+        const int state_before_stop = GetPlayState();
+        const bool is_playing_before_stop = (state_before_stop & kReaperPlayStatePlayingBit) != 0;
+        const bool is_recording_before_stop = (state_before_stop & kReaperPlayStateRecordingBit) != 0;
+        if (!is_playing_before_stop && !is_recording_before_stop) {
+            return;
+        }
+        ReaProject* proj = EnumProjects(-1, nullptr, 0);
+        double restore_pos = proj ? GetPlayPositionEx(proj) : GetPlayPosition();
+        if (!std::isnan(forced_restore_pos)) {
+            restore_pos = forced_restore_pos;
+        }
+        Main_OnCommand(kCmdTransportStopSaveAllRecordedMedia, 0);
+        if (proj) {
+            SetEditCurPos2(proj, restore_pos, false, false);
+        } else {
+            SetEditCurPos(restore_pos, false, false);
+        }
+    };
+
+    const long long guard_until = ext.transport_guard_until_ms_.load();
+    if (guard_until > 0 && now_ms < guard_until && ext.transport_guard_from_stopped_state_.load()) {
+        const int play_state = GetPlayState();
+        if ((play_state & kReaperPlayStatePlayingBit) != 0 || (play_state & kReaperPlayStateRecordingBit) != 0) {
+            stop_without_rewind(ext.transport_guard_restore_pos_.load());
+            ext.StopManualTransportFlash();
+        }
+    } else if (guard_until > 0 && now_ms >= guard_until) {
+        ext.transport_guard_until_ms_ = 0;
+        ext.transport_guard_from_stopped_state_ = false;
+    }
+
+    // Hard guard: while assignment/sync suppression is active, drop queued actions.
+    if (now_ms < ext.suppress_all_cc_until_ms_.load()) {
+        ext.pending_midi_command_ = 0;
+        ext.pending_record_start_ = false;
+        ext.pending_record_stop_ = false;
+        ext.pending_toggle_soundcheck_mode_ = false;
+        return;
+    }
+
+    const int play_state_now = GetPlayState();
+    const bool is_recording_now = (play_state_now & kReaperPlayStateRecordingBit) != 0;
     if (ext.pending_record_start_.exchange(false)) {
-        Main_OnCommand(1013, 0);  // Transport: Record (main thread)
+        // Record action is a toggle in REAPER; only issue it when not already recording.
+        if (!is_recording_now) {
+            Main_OnCommand(kCmdTransportRecord, 0);  // Transport: Record (main thread)
+        }
     }
     if (ext.pending_record_stop_.exchange(false)) {
-        Main_OnCommand(1016, 0);  // Transport: Stop (main thread)
+        stop_without_rewind();
+    }
+    if (ext.pending_toggle_soundcheck_mode_.exchange(false)) {
+        ext.ToggleSoundcheckMode();
+    }
+    const int midi_cmd = ext.pending_midi_command_.exchange(0);
+    if (midi_cmd > 0) {
+        if (midi_cmd == kCmdTransportRecord) {
+            // Record action is a toggle in REAPER; only issue it when not already recording.
+            if (!is_recording_now) {
+                Main_OnCommand(midi_cmd, 0);
+            }
+        } else if (midi_cmd == kCmdTransportStopSaveAllRecordedMedia) {
+            stop_without_rewind();
+        } else {
+            Main_OnCommand(midi_cmd, 0);
+        }
     }
 }
 
 // Connects and verifies OSC reachability only; track creation is user-driven.
 bool ReaperExtension::ConnectToWing() {
+    // Avoid unintended transport commands from transient Wing MIDI echoes
+    // while connection/setup traffic is in flight.
+    struct ScopedMidiSuppress {
+        std::atomic<bool>& flag;
+        explicit ScopedMidiSuppress(std::atomic<bool>& f) : flag(f) { flag = true; }
+        ~ScopedMidiSuppress() { flag = false; }
+    } midi_suppress_guard(suppress_midi_processing_);
+
     if (connected_) {
         Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Already connected\n");
         return true;
@@ -314,6 +405,9 @@ bool ReaperExtension::ConnectToWing() {
     if (config_.sd_lr_route_enabled) {
         RouteMainLRToCardForSDRecording();
     }
+
+    // If MIDI actions are enabled in the extension, re-apply current mapping to the Wing.
+    SyncMidiActionsToWing();
     
     return true;
 }
@@ -625,6 +719,13 @@ bool ReaperExtension::ValidateLiveRecordingSetup(std::string& details) {
 
 // Setup virtual soundcheck from selected channels
 void ReaperExtension::SetupSoundcheckFromSelection(const std::vector<ChannelSelectionInfo>& channels, bool setup_soundcheck) {
+    // During live-setup operations, ignore incoming MIDI hook traffic from Wing.
+    struct ScopedMidiSuppress {
+        std::atomic<bool>& flag;
+        explicit ScopedMidiSuppress(std::atomic<bool>& f) : flag(f) { flag = true; }
+        ~ScopedMidiSuppress() { flag = false; }
+    } midi_suppress_guard(suppress_midi_processing_);
+
     if (!connected_ || !osc_handler_) {
         Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Not connected\n");
         return;
@@ -936,10 +1037,8 @@ void ReaperExtension::EnableMonitoring(bool enable) {
     monitoring_enabled_ = enable;
     
     if (enable) {
-        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Real-time monitoring enabled\n");
         status_message_ = "Monitoring active";
     } else {
-        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Real-time monitoring disabled\n");
         status_message_ = "Monitoring inactive";
     }
 }
@@ -955,7 +1054,6 @@ void ReaperExtension::StartAutoRecordMonitor() {
     }
     auto_record_monitor_running_ = true;
     auto_record_monitor_thread_ = std::make_unique<std::thread>(&ReaperExtension::MonitorAutoRecordLoop, this);
-    Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Auto-record monitor started\n");
 }
 
 void ReaperExtension::StopAutoRecordMonitor() {
@@ -970,7 +1068,6 @@ void ReaperExtension::StopAutoRecordMonitor() {
     auto_record_started_by_plugin_ = false;
     StopWarningFlash();
     ClearLayerState();
-    Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Auto-record monitor stopped\n");
 }
 
 void ReaperExtension::ApplyAutoRecordSettings() {
@@ -978,6 +1075,10 @@ void ReaperExtension::ApplyAutoRecordSettings() {
     if (connected_ && config_.auto_record_enabled) {
         StartAutoRecordMonitor();
     }
+}
+
+void ReaperExtension::PauseAutoRecordForSetup() {
+    StopAutoRecordMonitor();
 }
 
 double ReaperExtension::GetMaxArmedTrackPeak() const {
@@ -1030,17 +1131,65 @@ void ReaperExtension::MonitorAutoRecordLoop() {
     auto record_started_at = std::chrono::steady_clock::time_point{};
     auto last_signal_at = std::chrono::steady_clock::time_point{};
     auto last_warning_event_at = std::chrono::steady_clock::time_point{};
+    auto last_record_led_step_at = std::chrono::steady_clock::time_point{};
+    size_t record_led_step = 0;
 
     while (auto_record_monitor_running_) {
         const auto now = std::chrono::steady_clock::now();
+        const long long now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                     now.time_since_epoch())
+                                     .count();
         double peak = GetMaxArmedTrackPeak();
         const bool above = peak >= threshold_lin;
-        const bool is_recording = (GetPlayState() & kReaperPlayStateRecordingBit) != 0;
+        const int play_state = GetPlayState();
+        const bool is_recording = (play_state & kReaperPlayStateRecordingBit) != 0;
+        const bool is_playing = (play_state & kReaperPlayStatePlayingBit) != 0;
         if (above) {
             last_signal_at = now;
         }
 
+        // Short suppression window after manual Record CC press:
+        // avoid warning race before REAPER reports recording state.
+        if (!is_recording && now_ms < manual_record_suppress_until_ms_.load()) {
+            above_since = {};
+            below_since = {};
+            if (warning_flash_running_) {
+                StopWarningFlash(true);
+                ClearLayerState();
+            }
+            std::this_thread::sleep_for(poll_interval);
+            continue;
+        }
+
+        // Playback should suppress warning mode entirely.
+        if (is_playing && !is_recording) {
+            above_since = {};
+            below_since = {};
+            if (warning_flash_running_) {
+                StopWarningFlash(true);
+                ClearLayerState();
+            }
+            std::this_thread::sleep_for(poll_interval);
+            continue;
+        }
+
         if (!is_recording) {
+            // Auto-start was requested but REAPER has not yet entered record:
+            // suppress retrigger to prevent duplicate takes/toggle churn.
+            if (auto_record_started_by_plugin_) {
+                if (record_started_at.time_since_epoch().count() == 0) {
+                    record_started_at = now;
+                }
+                if (now - record_started_at < std::chrono::milliseconds(1500)) {
+                    std::this_thread::sleep_for(poll_interval);
+                    continue;
+                }
+                // Recover if recording did not start in time.
+                auto_record_started_by_plugin_ = false;
+            }
+
+            record_led_step = 0;
+            last_record_led_step_at = std::chrono::steady_clock::time_point{};
             if (above) {
                 if (above_since.time_since_epoch().count() == 0) {
                     above_since = now;
@@ -1048,7 +1197,6 @@ void ReaperExtension::MonitorAutoRecordLoop() {
                     if (!warning_flash_running_) {
                         StartWarningFlash();
                         SetWarningLayerState();
-                        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Signal above threshold long enough - starting CC flash warning\n");
                     }
                     if (config_.auto_record_warning_only) {
                         const bool hold_active = last_warning_event_at.time_since_epoch().count() != 0 &&
@@ -1060,11 +1208,9 @@ void ReaperExtension::MonitorAutoRecordLoop() {
                             continue;
                         }
                         last_warning_event_at = now;
-                        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: WARNING trigger (signal above threshold)\n");
                         SendOscToWing(config_, config_.osc_warning_path, 1);
                     } else {
                         if (warning_flash_running_) {
-                            Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Recording started - stopping CC flash warning\n");
                             StopWarningFlash();
                         }
                         SetRecordingLayerState();
@@ -1079,27 +1225,47 @@ void ReaperExtension::MonitorAutoRecordLoop() {
                     }
                     above_since = {};
                     below_since = {};
-                    Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Trigger fired (signal above threshold)\n");
                 }
             } else {
                 above_since = {};
                 const bool hold_expired = last_signal_at.time_since_epoch().count() == 0 ||
                                           (now - last_signal_at >= hold_needed);
-                if (warning_flash_running_ && hold_expired && !manual_flash_override_) {
-                    Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Signal dropped below threshold - stopping CC flash warning\n");
+                if (warning_flash_running_ && hold_expired) {
                     StopWarningFlash();
                     ClearLayerState();
                 }
             }
         } else {
-            StopWarningFlash();
-            SetRecordingLayerState();
+            // Recording state (manual or auto): warning system must be inactive.
+            manual_record_suppress_until_ms_ = 0;
+            StopWarningFlash(true);
+            above_since = {};
+            last_warning_event_at = {};
             if (!auto_record_started_by_plugin_) {
-                // Respect manual recording state and avoid auto-stop in this case.
-                above_since = {};
-                below_since = {};
+                // Manual recording: keep warning disabled, but do not apply auto-record
+                // recording visuals (they would overwrite manual play/record flashes).
                 std::this_thread::sleep_for(poll_interval);
                 continue;
+            }
+
+            SetRecordingLayerState();
+            if (osc_handler_) {
+                const int layer = std::min(16, std::max(1, config_.warning_flash_cc_layer));
+                if (last_record_led_step_at.time_since_epoch().count() == 0 ||
+                    (now - last_record_led_step_at) >= std::chrono::milliseconds(440)) {
+                    // Slower flowing pattern:
+                    // 1 -> 12 -> 123 -> 1234 -> 234 -> 34 -> 4 -> off -> repeat
+                    record_led_step = (record_led_step + 1) % 8;
+                    last_record_led_step_at = now;
+                }
+                static const int kMasks[8] = {
+                    0b0001, 0b0011, 0b0111, 0b1111, 0b1110, 0b1100, 0b1000, 0b0000
+                };
+                const int mask = kMasks[record_led_step];
+                for (int b = 1; b <= 4; ++b) {
+                    const bool on = (mask & (1 << (b - 1))) != 0;
+                    osc_handler_->SetUserControlLed(layer, b, on);
+                }
             }
 
             if (above) {
@@ -1119,7 +1285,6 @@ void ReaperExtension::MonitorAutoRecordLoop() {
                     ClearLayerState();
                     above_since = {};
                     below_since = {};
-                    Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Auto-record stopped (signal below threshold)\n");
                 }
             }
         }
@@ -1142,9 +1307,10 @@ void ReaperExtension::SetWarningLayerState() {
         osc_handler_->QueryUserControlColor(layer, b);
     }
     osc_handler_->QueryUserControlRotaryText(layer, 1);
-    osc_handler_->SetUserControlRotaryName(layer, 1, "RECORDING");
-    osc_handler_->SetUserControlRotaryName(layer, 2, "NOT ENABLED");
-    osc_handler_->SetUserControlRotaryName(layer, 3, "!!");
+    osc_handler_->SetUserControlRotaryName(layer, 1, midi_actions_enabled_ ? "REAPER:" : "");
+    osc_handler_->SetUserControlRotaryName(layer, 2, "RECORDING");
+    osc_handler_->SetUserControlRotaryName(layer, 3, "NOT");
+    osc_handler_->SetUserControlRotaryName(layer, 4, "STARTED!!");
 }
 
 void ReaperExtension::SetRecordingLayerState() {
@@ -1158,14 +1324,14 @@ void ReaperExtension::SetRecordingLayerState() {
     const int layer = std::min(16, std::max(1, config_.warning_flash_cc_layer));
     osc_handler_->SetActiveUserControlLayer(layer);
     osc_handler_->QueryUserControlRotaryText(layer, 1);
-    osc_handler_->SetUserControlRotaryName(layer, 1, "REAPER");
-    osc_handler_->SetUserControlRotaryName(layer, 2, "STARTED");
-    osc_handler_->SetUserControlRotaryName(layer, 3, "RECORDING");
-    osc_handler_->SetUserControlRotaryName(layer, 4, "...");
+    osc_handler_->SetUserControlRotaryName(layer, 1, midi_actions_enabled_ ? "REAPER:" : "");
+    osc_handler_->SetUserControlRotaryName(layer, 2, "RECORDING");
+    osc_handler_->SetUserControlRotaryName(layer, 3, "STARTED");
+    osc_handler_->SetUserControlRotaryName(layer, 4, "....");
     const int recording_color = 6; // Force green for recording
     for (int b = 1; b <= 4; ++b) {
         osc_handler_->SetUserControlColor(layer, b, recording_color);
-        osc_handler_->SetUserControlLed(layer, b, true); // Steady on
+        osc_handler_->SetUserControlLed(layer, b, false);
     }
 }
 
@@ -1178,10 +1344,94 @@ void ReaperExtension::ClearLayerState() {
     for (int b = 1; b <= 4; ++b) {
         osc_handler_->SetUserControlLed(layer, b, false);
     }
-    osc_handler_->SetUserControlRotaryName(layer, 1, "");
+    osc_handler_->SetUserControlRotaryName(layer, 1, midi_actions_enabled_ ? "REAPER:" : "");
     osc_handler_->SetUserControlRotaryName(layer, 2, "");
     osc_handler_->SetUserControlRotaryName(layer, 3, "");
     osc_handler_->SetUserControlRotaryName(layer, 4, "");
+}
+
+void ReaperExtension::ApplyMidiShortcutButtonLabels() {
+    if (!osc_handler_) {
+        return;
+    }
+    const int layer = std::min(16, std::max(1, config_.warning_flash_cc_layer));
+    osc_handler_->SetUserControlRotaryName(layer, 1, "REAPER:");
+    // Row 1
+    osc_handler_->SetUserControlButtonName(layer, 1, "PLAY");
+    osc_handler_->SetUserControlButtonName(layer, 2, "RECORD");
+    osc_handler_->SetUserControlButtonName(layer, 3, "SOUNDCHECK");
+    osc_handler_->SetUserControlButtonName(layer, 4, "STOP");
+    // Row 2
+    osc_handler_->SetUserControlButtonName(layer, 1, "SET MARKER", true);
+    osc_handler_->SetUserControlButtonName(layer, 2, "PREV MARKER", true);
+    osc_handler_->SetUserControlButtonName(layer, 3, "NEXT MARKER", true);
+}
+
+void ReaperExtension::ClearMidiShortcutButtonLabels() {
+    if (!osc_handler_) {
+        return;
+    }
+    const int layer = std::min(16, std::max(1, config_.warning_flash_cc_layer));
+    for (int b = 1; b <= 4; ++b) {
+        osc_handler_->SetUserControlButtonName(layer, b, "");
+    }
+    for (int b = 1; b <= 3; ++b) {
+        osc_handler_->SetUserControlButtonName(layer, b, "", true);
+    }
+}
+
+void ReaperExtension::ApplyMidiShortcutButtonCommands() {
+    if (!osc_handler_) {
+        return;
+    }
+    const int layer = std::min(16, std::max(1, config_.warning_flash_cc_layer));
+    // Top row (bu): play/record as toggle, soundcheck/stop as push
+    osc_handler_->SetUserControlButtonMidiCCToggle(layer, 1, 1, MIDI_ACTIONS[0].cc_number, 0, false, true);
+    osc_handler_->SetUserControlButtonMidiCCToggle(layer, 2, 1, MIDI_ACTIONS[1].cc_number, 0, false, true);
+    osc_handler_->SetUserControlButtonMidiCCToggle(layer, 3, 1, MIDI_ACTIONS[2].cc_number, 0, false, false);
+    osc_handler_->SetUserControlButtonMidiCCToggle(layer, 4, 1, MIDI_ACTIONS[3].cc_number, 0, false, false);
+    // Bottom row (bd): set/prev/next marker on buttons 1..3
+    osc_handler_->SetUserControlButtonMidiCCToggle(layer, 1, 1, MIDI_ACTIONS[4].cc_number, 0, true, true);
+    osc_handler_->SetUserControlButtonMidiCCToggle(layer, 2, 1, MIDI_ACTIONS[5].cc_number, 0, true, true);
+    osc_handler_->SetUserControlButtonMidiCCToggle(layer, 3, 1, MIDI_ACTIONS[6].cc_number, 0, true, true);
+    // Force all mapped button values off so enabling mappings does not trigger stale toggle states.
+    for (int b = 1; b <= 4; ++b) {
+        osc_handler_->SetUserControlButtonValue(layer, b, 0, false);
+    }
+    for (int b = 1; b <= 3; ++b) {
+        osc_handler_->SetUserControlButtonValue(layer, b, 0, true);
+    }
+    // Keep shortcut buttons unlit by default; warning/record states drive LEDs explicitly.
+    for (int pass = 0; pass < 4; ++pass) {
+        for (int b = 1; b <= 4; ++b) {
+            osc_handler_->SetUserControlColor(layer, b, 0);
+            osc_handler_->SetUserControlLed(layer, b, false);
+            osc_handler_->SetUserControlButtonLed(layer, b, false, false);
+            osc_handler_->SetUserControlButtonLed(layer, b, false, true);
+        }
+        // Wing appears to latch some user control LED state; retry clear a few times.
+        std::this_thread::sleep_for(std::chrono::milliseconds(60));
+    }
+    // Final delayed pass to clear any late-applied console defaults.
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    for (int b = 1; b <= 4; ++b) {
+        osc_handler_->SetUserControlLed(layer, b, false);
+        osc_handler_->SetUserControlButtonLed(layer, b, false, false);
+        osc_handler_->SetUserControlButtonLed(layer, b, false, true);
+    }
+}
+
+void ReaperExtension::ClearMidiShortcutButtonCommands() {
+    if (!osc_handler_) {
+        return;
+    }
+    const int layer = std::min(16, std::max(1, config_.warning_flash_cc_layer));
+    for (int b = 1; b <= 4; ++b) {
+        osc_handler_->ClearUserControlButtonCommand(layer, b, false);
+    }
+    for (int b = 1; b <= 3; ++b) {
+        osc_handler_->ClearUserControlButtonCommand(layer, b, true);
+    }
 }
 
 void ReaperExtension::StartWarningFlash() {
@@ -1193,9 +1443,7 @@ void ReaperExtension::StartWarningFlash() {
 }
 
 void ReaperExtension::StopWarningFlash(bool force) {
-    if (manual_flash_override_ && !force) {
-        return;
-    }
+    (void)force;
     if (!warning_flash_running_) {
         return;
     }
@@ -1218,17 +1466,48 @@ void ReaperExtension::WarningFlashLoop() {
         return;
     }
     const int layer = std::min(16, std::max(1, config_.warning_flash_cc_layer));
-    const int color = 9; // Warning is fixed red
+    int active_color = osc_handler_->GetCachedUserControlColor(layer, 1, config_.warning_flash_cc_color);
     for (int b = 1; b <= 4; ++b) {
-        osc_handler_->SetUserControlColor(layer, b, color);
+        osc_handler_->SetUserControlColor(layer, b, active_color);
     }
 
     const int sequence[] = {1, 2, 3, 4, 3, 2};
     size_t seq_idx = 0;
+    bool warning_text_visible = true;
+    auto last_warning_text_toggle = std::chrono::steady_clock::time_point{};
+    int color_poll_div = 0;
     while (warning_flash_running_) {
+        const auto now = std::chrono::steady_clock::now();
+        // Refresh color from button 1 assignment every ~1s (8 * 120ms).
+        if (++color_poll_div >= 8) {
+            color_poll_div = 0;
+            osc_handler_->QueryUserControlColor(layer, 1);
+            const int latest = osc_handler_->GetCachedUserControlColor(layer, 1, active_color);
+            if (latest != active_color) {
+                active_color = latest;
+                for (int b = 1; b <= 4; ++b) {
+                    osc_handler_->SetUserControlColor(layer, b, active_color);
+                }
+            }
+        }
         const int active = sequence[seq_idx];
         for (int b = 1; b <= 4; ++b) {
             osc_handler_->SetUserControlLed(layer, b, b == active);
+        }
+        // Blink warning text on encoders 2..4 at 1/4 of LED chase speed (480ms).
+        if (last_warning_text_toggle.time_since_epoch().count() == 0 ||
+            (now - last_warning_text_toggle) >= std::chrono::milliseconds(480)) {
+            if (warning_text_visible) {
+                osc_handler_->SetUserControlRotaryName(layer, 2, "RECORDING");
+                osc_handler_->SetUserControlRotaryName(layer, 3, "NOT");
+                osc_handler_->SetUserControlRotaryName(layer, 4, "STARTED!!");
+            } else {
+                osc_handler_->SetUserControlRotaryName(layer, 2, "");
+                osc_handler_->SetUserControlRotaryName(layer, 3, "");
+                osc_handler_->SetUserControlRotaryName(layer, 4, "");
+            }
+            warning_text_visible = !warning_text_visible;
+            last_warning_text_toggle = now;
         }
         seq_idx = (seq_idx + 1) % (sizeof(sequence) / sizeof(sequence[0]));
         std::this_thread::sleep_for(std::chrono::milliseconds(120));
@@ -1281,35 +1560,6 @@ void ReaperExtension::ApplySDRoutingNoDialog() {
 double ReaperExtension::ReadCurrentTriggerLevel() {
     return GetMaxArmedTrackPeak();
 }
-
-void ReaperExtension::SendWarningOscNow() {
-    SendOscToWing(config_, config_.osc_warning_path, 1);
-}
-
-void ReaperExtension::SendStartOscNow() {
-    SendOscToWing(config_, config_.osc_start_path, 1);
-}
-
-void ReaperExtension::SendStopOscNow() {
-    SendOscToWing(config_, config_.osc_stop_path, 0);
-}
-
-void ReaperExtension::TestWarningFlash() {
-    if (!osc_handler_) {
-        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Cannot test CC flash while disconnected\n");
-        return;
-    }
-    manual_flash_override_ = true;
-    StartWarningFlash();
-    Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Test CC flash started\n");
-    std::thread([this]() {
-        std::this_thread::sleep_for(std::chrono::milliseconds(3000));
-        manual_flash_override_ = false;
-        StopWarningFlash(true);
-        Log("AUDIOLAB.wing.reaper.virtualsoundcheck: Test CC flash stopped\n");
-    }).detach();
-}
-
 
 void ReaperExtension::ConfigureVirtualSoundcheck() {
     if (!connected_ || !osc_handler_) {
@@ -1693,141 +1943,88 @@ void ReaperExtension::EnableWingMidiDevice() {
     }
 }
 
-void ReaperExtension::RegisterMidiShortcuts() {
-    Log("\n=== Wing MIDI Actions Configuration ===\n\n");
-    Log("APPROACH: Programmatic MIDI shortcut assignment\n\n");
-    
-    // Get path to reaper-kb.ini
-    const char* resource_path = GetResourcePath();
-    if (!resource_path) {
-        Log("✗ ERROR: Could not get REAPER resource path\n");
-        Log("GetResourcePath() returned nullptr - REAPER may not be fully initialized\n");
-        return;
-    }
-    
-    std::string kb_ini_path = std::string(resource_path) + "/reaper-kb.ini";
-    
-    char debug_msg[512];
-    snprintf(debug_msg, sizeof(debug_msg), "Resource path: %s\n", resource_path);
-    Log(debug_msg);
-    snprintf(debug_msg, sizeof(debug_msg), "KB.ini path: %s\n", kb_ini_path.c_str());
-    Log(debug_msg);
-    
-    // Check if file exists and is writable
-    std::ofstream test_file(kb_ini_path, std::ios::app);
-    if (!test_file.is_open()) {
-        snprintf(debug_msg, sizeof(debug_msg), "✗ ERROR: Cannot open %s for writing\n", kb_ini_path.c_str());
-        Log(debug_msg);
-        return;
-    }
-    test_file.close();
-    
-    Log("\nConfigured mappings:\n");
-    for (const auto& action : MIDI_ACTIONS) {
-        const char* label = action.description;
-        const char* sep = strstr(action.description, ": ");
-        if (sep && *(sep + 2) != '\0') {
-            label = sep + 2;
-        }
-
-        char msg[256];
-        snprintf(msg, sizeof(msg), 
-                 "  CC#%d (Ch 1) → %s\n", 
-                 action.cc_number, label);
-        Log(msg);
-        
-        // Add MIDI shortcut to reaper-kb.ini
-        // Format: KEY <status_byte> <data1_encoded> <action_id> <param>
-        // Status byte: 0xB0 (176) = CC on channel 1
-        // Data1 is stored with +128 offset by REAPER: (cc_number + 128)
-        // Example: KEY 176 148 40157 0  (CC#20 → Insert marker, stored as 20+128=148)
-        
-        int cc_encoded = action.cc_number + 128;  // REAPER stores CC numbers with +128 offset
-        std::string shortcut_line = "KEY 176 " + std::to_string(cc_encoded) + 
-                                   " " + std::to_string(action.command_id) + " 0\n";
-        
-        // Append to reaper-kb.ini
-        std::ofstream kb_file(kb_ini_path, std::ios::app);
-        if (kb_file.is_open()) {
-            kb_file << shortcut_line;
-            kb_file.close();
-            snprintf(debug_msg, sizeof(debug_msg), "  ✓ Wrote: %s", shortcut_line.c_str());
-            Log(debug_msg);
-        } else {
-            snprintf(debug_msg, sizeof(debug_msg), "  ✗ Failed to write CC#%d mapping\n", action.cc_number);
-            Log(debug_msg);
-        }
-    }
-    
-    Log("\n✓ MIDI shortcuts written to reaper-kb.ini\n");
-    
-    // Touch the file to update modification time
-    // This triggers REAPER's file watcher to reload keyboard shortcuts
-    // without requiring a restart
-    if (TouchFile(kb_ini_path)) {
-        Log("✓ Updated reaper-kb.ini modification time\n");
-        Log("✓ REAPER should reload shortcuts automatically\n\n");
-    } else {
-        Log("⚠ Could not update file modification time (REAPER will reload on next window focus)\n\n");
-    }
-    
-    Log("To verify:\n");
-    Log("  1. The Wing MIDI buttons should work immediately\n");
-    Log("  2. Or: Enable Wing MIDI in Preferences → MIDI Devices\n");
-    Log("  3. Press Wing buttons - actions should execute\n\n");
-}
-
 void ReaperExtension::UnregisterMidiShortcuts() {
-    const char* resource_path = GetResourcePath();
-    if (!resource_path) return;
-    
-    std::string kb_ini_path = std::string(resource_path) + "/reaper-kb.ini";
-    std::ifstream in_file(kb_ini_path);
-    std::string content;
-    std::string line;
-    
-    // Read file and remove Wing MIDI lines
-    while (std::getline(in_file, line)) {
-        bool is_wing_midi = false;
-        for (const auto& action : MIDI_ACTIONS) {
-            int cc_encoded = action.cc_number + 128;  // Use same encoding as register
-            std::string wing_line = "KEY 176 " + std::to_string(cc_encoded);
-            if (line.find(wing_line) != std::string::npos) {
-                is_wing_midi = true;
-                break;
+    const auto kb_paths = GetReaperKeymapPaths();
+    for (const auto& kb_ini_path : kb_paths) {
+        std::ifstream in_file(kb_ini_path);
+        if (!in_file.is_open()) {
+            continue;
+        }
+        std::string content;
+        std::string line;
+        while (std::getline(in_file, line)) {
+            bool is_wing_midi = false;
+            for (const auto& action : MIDI_ACTIONS) {
+                int cc_encoded = action.cc_number + 128;
+                std::string wing_line = "KEY 176 " + std::to_string(cc_encoded);
+                if (line.find(wing_line) != std::string::npos) {
+                    is_wing_midi = true;
+                    break;
+                }
+            }
+            if (!is_wing_midi) {
+                content += line + "\n";
             }
         }
-        if (!is_wing_midi) {
-            content += line + "\n";
-        }
-    }
-    in_file.close();
-    
-    // Write back
-    std::ofstream out_file(kb_ini_path);
-    out_file << content;
-    out_file.close();
-    
-    // Touch the file to update modification time
-    // This triggers REAPER's file watcher to reload keyboard shortcuts
-    if (TouchFile(kb_ini_path)) {
-        Log("✓ MIDI shortcuts removed and reloader triggered\n");
-    } else {
-        Log("MIDI shortcuts removed from reaper-kb.ini\n");
+        in_file.close();
+        std::ofstream out_file(kb_ini_path);
+        out_file << content;
+        out_file.close();
+        TouchFile(kb_ini_path);
     }
 }
 
 void ReaperExtension::EnableMidiActions(bool enable) {
-    if (midi_actions_enabled_ == enable) {
-        return;  // Already in desired state
-    }
-    
-    midi_actions_enabled_ = enable;
-    
     if (enable) {
-        RegisterMidiShortcuts();
-    } else {
+        const int state_before = GetPlayState();
+        const bool was_stopped_before = ((state_before & kReaperPlayStatePlayingBit) == 0) &&
+                                        ((state_before & kReaperPlayStateRecordingBit) == 0);
+        ReaProject* proj = EnumProjects(-1, nullptr, 0);
+        const double pos_before = proj ? GetPlayPositionEx(proj) : GetPlayPosition();
+        if (was_stopped_before) {
+            transport_guard_from_stopped_state_ = true;
+            transport_guard_restore_pos_ = pos_before;
+            transport_guard_until_ms_ = SteadyNowMs() + 7000;
+        } else {
+            transport_guard_from_stopped_state_ = false;
+            transport_guard_until_ms_ = 0;
+        }
+
+        // Do not process incoming MIDI while assignment commands are being pushed to Wing.
+        suppress_midi_processing_ = true;
+        const long long suppress_until = SteadyNowMs() + 5000;
+        suppress_all_cc_until_ms_ = suppress_until;
+        suppress_play_cc_until_ms_ = suppress_until;
+        suppress_record_cc_until_ms_ = suppress_until;
+        pending_midi_command_ = 0;
+        pending_record_start_ = false;
+        pending_record_stop_ = false;
+        pending_toggle_soundcheck_mode_ = false;
+        // Ensure legacy keymap shortcuts are removed; use plugin MIDI handling only.
+        StopMidiCapture();
         UnregisterMidiShortcuts();
+        ApplyMidiShortcutButtonLabels();
+        ApplyMidiShortcutButtonCommands();
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        // Start listening only after assignment is sent.
+        StartMidiCapture();
+        // Wing may emit CC echoes while applying button command configuration.
+        const long long post_apply_suppress_until = SteadyNowMs() + 5000;
+        suppress_play_cc_until_ms_ = post_apply_suppress_until;
+        suppress_record_cc_until_ms_ = post_apply_suppress_until;
+        suppress_all_cc_until_ms_ = post_apply_suppress_until;
+        midi_actions_enabled_ = true;
+        suppress_midi_processing_ = false;
+    } else {
+        if (!midi_actions_enabled_) {
+            return;  // Already disabled
+        }
+        midi_actions_enabled_ = false;
+        StopManualTransportFlash();
+        StopMidiCapture();
+        UnregisterMidiShortcuts();
+        ClearMidiShortcutButtonCommands();
+        ClearMidiShortcutButtonLabels();
     }
     
     //Update config
@@ -1835,50 +2032,189 @@ void ReaperExtension::EnableMidiActions(bool enable) {
     config_.SaveToFile(WingConfig::GetConfigPath());
 }
 
-bool ReaperExtension::AreMidiShortcutsRegistered() const {
-    const char* resource_path = GetResourcePath();
-    if (!resource_path) return false;
-    
-    std::string kb_ini_path = std::string(resource_path) + "/reaper-kb.ini";
-    std::ifstream kb_file(kb_ini_path);
-    if (!kb_file.is_open()) return false;
-    
-    std::string line;
-    int found_count = 0;
-    
-    // Check for Wing MIDI shortcuts (CC 20-26 encoded as 148-154)
-    while (std::getline(kb_file, line)) {
-        // Look for our MIDI shortcuts with the +128 offset
-        if (line.find("KEY 176 148") != std::string::npos ||  // CC 20
-            line.find("KEY 176 149") != std::string::npos ||  // CC 21
-            line.find("KEY 176 150") != std::string::npos ||  // CC 22
-            line.find("KEY 176 151") != std::string::npos ||  // CC 23
-            line.find("KEY 176 152") != std::string::npos ||  // CC 24
-            line.find("KEY 176 153") != std::string::npos ||  // CC 25
-            line.find("KEY 176 154") != std::string::npos) {  // CC 26
-            found_count++;
+void ReaperExtension::SyncMidiActionsToWing() {
+    if (!midi_actions_enabled_ || !connected_ || !osc_handler_) {
+        return;
+    }
+    const int state_before = GetPlayState();
+    const bool was_stopped_before = ((state_before & kReaperPlayStatePlayingBit) == 0) &&
+                                    ((state_before & kReaperPlayStateRecordingBit) == 0);
+    ReaProject* proj = EnumProjects(-1, nullptr, 0);
+    const double pos_before = proj ? GetPlayPositionEx(proj) : GetPlayPosition();
+    if (was_stopped_before) {
+        transport_guard_from_stopped_state_ = true;
+        transport_guard_restore_pos_ = pos_before;
+        transport_guard_until_ms_ = SteadyNowMs() + 7000;
+    } else {
+        transport_guard_from_stopped_state_ = false;
+        transport_guard_until_ms_ = 0;
+    }
+
+    suppress_midi_processing_ = true;
+    const long long suppress_until = SteadyNowMs() + 5000;
+    suppress_all_cc_until_ms_ = suppress_until;
+    suppress_play_cc_until_ms_ = suppress_until;
+    suppress_record_cc_until_ms_ = suppress_until;
+    pending_midi_command_ = 0;
+    pending_record_start_ = false;
+    pending_record_stop_ = false;
+    pending_toggle_soundcheck_mode_ = false;
+    // Temporarily pause capture while pushing commands to Wing.
+    // Keep keymap shortcuts disabled (plugin MIDI handling only).
+    StopMidiCapture();
+    UnregisterMidiShortcuts();
+    ApplyMidiShortcutButtonLabels();
+    ApplyMidiShortcutButtonCommands();
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    StartMidiCapture();
+    // Wing may emit CC echoes while applying button command configuration.
+    const long long post_apply_suppress_until = SteadyNowMs() + 5000;
+    suppress_play_cc_until_ms_ = post_apply_suppress_until;
+    suppress_record_cc_until_ms_ = post_apply_suppress_until;
+    suppress_all_cc_until_ms_ = post_apply_suppress_until;
+    suppress_midi_processing_ = false;
+}
+
+void ReaperExtension::TriggerManualTransportFlash(int color_index) {
+    if (!connected_ || !osc_handler_) {
+        return;
+    }
+    std::unique_ptr<std::thread> thread_to_join;
+    {
+        std::lock_guard<std::mutex> lock(manual_transport_flash_mutex_);
+        manual_transport_flash_running_ = false;
+        if (manual_transport_flash_thread_) {
+            thread_to_join = std::move(manual_transport_flash_thread_);
         }
     }
-    kb_file.close();
-    
-    // Return true if we found all 7 shortcuts
-    return found_count >= 7;
+    if (thread_to_join && thread_to_join->joinable()) {
+        thread_to_join->join();
+    }
+
+    try {
+        manual_transport_flash_running_ = true;
+        manual_transport_flash_thread_ = std::make_unique<std::thread>([this, color_index]() {
+            if (!osc_handler_) {
+                manual_transport_flash_running_ = false;
+                return;
+            }
+            const int layer = std::min(16, std::max(1, config_.warning_flash_cc_layer));
+            const int masks[8] = {0b0001, 0b0011, 0b0111, 0b1111, 0b1110, 0b1100, 0b1000, 0b0000};
+            for (int b = 1; b <= 4; ++b) {
+                osc_handler_->SetUserControlColor(layer, b, color_index);
+            }
+            // Keep flowing until an explicit stop (or another manual flash request).
+            while (manual_transport_flash_running_) {
+                for (int i = 0; i < 8 && manual_transport_flash_running_; ++i) {
+                    const int mask = masks[i];
+                    for (int b = 1; b <= 4; ++b) {
+                        const bool on = (mask & (1 << (b - 1))) != 0;
+                        osc_handler_->SetUserControlLed(layer, b, on);
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(440));
+                }
+            }
+            for (int b = 1; b <= 4; ++b) {
+                osc_handler_->SetUserControlLed(layer, b, false);
+            }
+            manual_transport_flash_running_ = false;
+        });
+    } catch (const std::exception& e) {
+        manual_transport_flash_running_ = false;
+        Log("Manual transport flash thread failed: " + std::string(e.what()) + "\n");
+    } catch (...) {
+        manual_transport_flash_running_ = false;
+        Log("Manual transport flash thread failed with unknown error.\n");
+    }
+}
+
+void ReaperExtension::StopManualTransportFlash() {
+    std::unique_ptr<std::thread> thread_to_join;
+    {
+        std::lock_guard<std::mutex> lock(manual_transport_flash_mutex_);
+        manual_transport_flash_running_ = false;
+        if (manual_transport_flash_thread_) {
+            thread_to_join = std::move(manual_transport_flash_thread_);
+        }
+    }
+    if (thread_to_join && thread_to_join->joinable()) {
+        thread_to_join->join();
+    }
+}
+
+void ReaperExtension::StartMidiCapture() {
+    if (midi_capture_running_) {
+        return;
+    }
+    midi_inputs_.clear();
+    const int n = GetNumMIDIInputs();
+    for (int i = 0; i < n; ++i) {
+        char device_name[256];
+        if (!GetMIDIInputName(i, device_name, sizeof(device_name))) {
+            continue;
+        }
+        std::string name_lower = device_name;
+        std::transform(name_lower.begin(), name_lower.end(), name_lower.begin(), ::tolower);
+        if (name_lower.find("wing") == std::string::npos) {
+            continue;
+        }
+        midi_Input* in = CreateMIDIInput(i);
+        if (in) {
+            in->start();
+            midi_inputs_.push_back(in);
+        }
+    }
+    if (midi_inputs_.empty()) {
+        Log("⚠ No WING MIDI input could be opened for direct capture.\n");
+        return;
+    }
+    midi_capture_running_ = true;
+    midi_capture_thread_ = std::make_unique<std::thread>(&ReaperExtension::MidiCaptureLoop, this);
+}
+
+void ReaperExtension::StopMidiCapture() {
+    if (!midi_capture_running_) {
+        return;
+    }
+    midi_capture_running_ = false;
+    if (midi_capture_thread_ && midi_capture_thread_->joinable()) {
+        midi_capture_thread_->join();
+    }
+    midi_capture_thread_.reset();
+    for (auto* in : midi_inputs_) {
+        if (in) {
+            in->stop();
+            in->Destroy();
+        }
+    }
+    midi_inputs_.clear();
+}
+
+void ReaperExtension::MidiCaptureLoop() {
+    while (midi_capture_running_) {
+        const auto now_ms = (unsigned int)std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
+        for (auto* in : midi_inputs_) {
+            if (!in) continue;
+            in->SwapBufs(now_ms);
+            MIDI_eventlist* list = in->GetReadBuf();
+            if (!list) continue;
+            int bpos = 0;
+            MIDI_event_t* evt = nullptr;
+            while ((evt = list->EnumItems(&bpos)) != nullptr) {
+                if (evt->size >= 3) {
+                    ProcessMidiInput(evt->midi_message, evt->size);
+                }
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
 }
 
 bool ReaperExtension::MidiInputHook(bool is_midi, const unsigned char* data, int len, int dev_id) {
     // Get instance
     auto& ext = ReaperExtension::Instance();
-    
-    // Log EVERY call to both file and instance log for debugging
-    static int call_count = 0;
-    call_count++;
-    
-    if (call_count <= 5 || call_count % 100 == 0) {  // Log first 5 calls to UI, then every 100th
-        char debug[128];
-        snprintf(debug, sizeof(debug), "[HOOK CALLED #%d] is_midi=%d, len=%d, dev_id=%d\n", 
-                 call_count, is_midi, len, dev_id);
-        ext.Log(debug);
-    }
+    (void)dev_id;
     
     // Only process MIDI messages
     if (!is_midi || len < 3) {
@@ -1895,77 +2231,105 @@ bool ReaperExtension::MidiInputHook(bool is_midi, const unsigned char* data, int
 
 void ReaperExtension::ProcessMidiInput(const unsigned char* data, int len) {
     if (len < 3) return;
+    if (suppress_midi_processing_) {
+        return;
+    }
     
     unsigned char status = data[0];
     unsigned char cc_num = data[1];
     unsigned char value = data[2];
-    
-    // Debug: Log ALL MIDI messages to help diagnose issues
-    if (log_callback_) {
-        char debug_msg[256];
-        snprintf(debug_msg, sizeof(debug_msg), 
-                 "[MIDI DEBUG] Status: 0x%02X, CC: %d, Value: %d\n", 
-                 status, cc_num, value);
-        Log(debug_msg);
-    }
     
     // Check for Control Change on Channel 1 (0xB0)
     if (status != 0xB0) {
         return;  // Not CC on channel 1
     }
     
-    // Only respond to button press (value > 0), ignore release
-    if (value == 0) {
+    // Accept push/toggle value styles; dedupe very fast repeats.
+    static auto last_trigger_time = std::chrono::steady_clock::time_point{};
+    static int last_trigger_cc = -1;
+    const auto now = std::chrono::steady_clock::now();
+    const long long now_ms = SteadyNowMs();
+
+    // Ignore all incoming CC while Wing command assignment is being applied/synchronized.
+    if (now_ms < suppress_all_cc_until_ms_.load()) {
         return;
     }
+
+    // Ignore short MIDI echo caused by our own play/record highlight updates.
+    if ((cc_num == 20 && now_ms < suppress_play_cc_until_ms_.load()) ||
+        (cc_num == 21 && now_ms < suppress_record_cc_until_ms_.load())) {
+        return;
+    }
+
+    if (cc_num == last_trigger_cc &&
+        last_trigger_time.time_since_epoch().count() != 0 &&
+        (now - last_trigger_time) < std::chrono::milliseconds(80)) {
+        return;
+    }
+    last_trigger_cc = cc_num;
+    last_trigger_time = now;
     
     // Map CC numbers to REAPER command IDs
     int command_id = 0;
-    const char* action_name = nullptr;
     
     switch (cc_num) {
-        case 20:  // Set Marker
-            command_id = 40157;  // Markers: Insert marker at current position
-            action_name = "Set Marker";
-            break;
-        case 21:  // Previous Marker
-            command_id = 40172;  // Markers: Go to previous marker/project start
-            action_name = "Previous Marker";
-            break;
-        case 22:  // Next Marker
-            command_id = 40173;  // Markers: Go to next marker/project end
-            action_name = "Next Marker";
-            break;
-        case 23:  // Record
-            command_id = 1013;   // Transport: Record
-            action_name = "Record";
-            break;
-        case 24:  // Stop
-            command_id = 1016;   // Transport: Stop
-            action_name = "Stop";
-            break;
-        case 25:  // Play
+        case 20:  // Play
+            if (value == 0) {
+                return;  // Ignore toggle-off/release messages.
+            }
             command_id = 1007;   // Transport: Play
-            action_name = "Play";
+            TriggerManualTransportFlash(6);  // green
             break;
-        case 26:  // Pause
-            command_id = 1008;   // Transport: Pause
-            action_name = "Pause";
+        case 21:  // Record
+            if (value == 0) {
+                return;  // Ignore toggle-off/release messages.
+            }
+            command_id = 1013;   // Transport: Record
+            manual_record_suppress_until_ms_ = SteadyNowMs() + 2000;
+            if (warning_flash_running_) {
+                StopWarningFlash(true);
+                ClearLayerState();
+            }
+            TriggerManualTransportFlash(9);  // red
+            break;
+        case 22:  // Toggle virtual soundcheck mode
+            if (value == 0) {
+                return;  // Push-button release: ignore to avoid double toggle.
+            }
+            pending_toggle_soundcheck_mode_ = true;
+            break;
+        case 23:  // Stop
+            if (value == 0) {
+                return;  // Push-button release: ignore to avoid duplicate stop command.
+            }
+            command_id = 40667;  // Transport: Stop (save all recorded media)
+            manual_record_suppress_until_ms_ = 0;
+            StopManualTransportFlash();
+            break;
+        case 24:  // Set Marker
+            if (value == 0) {
+                return;  // Ignore toggle-off/release messages.
+            }
+            command_id = 40157;  // Markers: Insert marker at current position
+            break;
+        case 25:  // Previous Marker
+            if (value == 0) {
+                return;  // Ignore toggle-off/release messages.
+            }
+            command_id = 40172;  // Markers: Go to previous marker/project start
+            break;
+        case 26:  // Next Marker
+            if (value == 0) {
+                return;  // Ignore toggle-off/release messages.
+            }
+            command_id = 40173;  // Markers: Go to next marker/project end
             break;
         default:
             return;  // Not one of our mapped CCs
     }
-    
-    // Execute REAPER command
+    // Execute REAPER command on main thread timer.
     if (command_id != 0) {
-        Main_OnCommand(command_id, 0);
-        
-        // Log action (only if callback is set to avoid spam)
-        if (log_callback_) {
-            char msg[128];
-            snprintf(msg, sizeof(msg), "MIDI Action: %s (CC#%d)\n", action_name, cc_num);
-            Log(msg);
-        }
+        pending_midi_command_ = command_id;
     }
 }
 
