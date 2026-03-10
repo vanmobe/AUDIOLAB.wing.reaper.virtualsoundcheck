@@ -3,6 +3,7 @@
 **Status:** Coming Soon
 
 This file will contain a pre-configured REAPER snapshot with MIDI mappings for controlling AUDIOLAB.wing.reaper.virtualsoundcheck actions from your Behringer Wing custom buttons.
+In normal use this is not required, because the plugin pushes button commands automatically.
 
 ## What Will Be Included
 
@@ -20,9 +21,9 @@ When uploaded, this snap file will provide:
 3. Select the downloaded file
 4. All mappings will be configured automatically
 
-## Manual Setup
+## Manual Setup (Fallback Only)
 
-Until this snap file is available, you can configure manually by following the detailed instructions in [README.md](README.md).
+Until this snap file is available, and only if automatic assignment cannot be used, configure manually using [README.md](README.md).
 
 ---
 

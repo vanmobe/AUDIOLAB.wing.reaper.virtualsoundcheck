@@ -74,10 +74,13 @@ Default plugin path:
 - Plugin binary exists in your `UserPlugins` directory.
 - Connection to WING succeeds without OSC timeout errors.
 
-## Optional: Wing Button MIDI Control
+## Wing Button MIDI Control
 
-For optional custom button mapping from WING to REAPER actions, see:
+WING CC button assignments are pushed by the plugin when `Assign MIDI shortcuts to REAPER` is enabled in the plugin window.
 
+For mapping details (and legacy manual fallback), see:
+
+- [docs/CC_BUTTONS_AND_AUTO_TRIGGER.md](docs/CC_BUTTONS_AND_AUTO_TRIGGER.md)
 - [snapshots/README.md](snapshots/README.md)
 
 ## Uninstall

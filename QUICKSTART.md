@@ -40,7 +40,7 @@ Inside the AUDIOLAB.wing.reaper.virtualsoundcheck dialog:
 2. Run virtual soundcheck setup.
 3. Use soundcheck mode toggle (ALT source switching) when needed.
 
-## 5. Optional: Configure Wing Buttons
+## 5. Automatic Wing CC Button Setup
 
 Default mapping used by the plugin:
 
@@ -54,10 +54,12 @@ Default mapping used by the plugin:
 
 Use `MIDI CC` on channel 1 from WING custom controls.
 When `Assign MIDI shortcuts to REAPER` is enabled in the plugin, button labels and MIDI command bindings are pushed to the selected WING layer automatically.
+No manual REAPER action-list shortcut setup is required in normal use.
 
-Full setup steps:
+Detailed behavior:
 
 - [snapshots/README.md](snapshots/README.md)
+- [docs/CC_BUTTONS_AND_AUTO_TRIGGER.md](docs/CC_BUTTONS_AND_AUTO_TRIGGER.md)
 
 ## 6. Optional: Auto-Record Trigger
 
@@ -116,5 +118,6 @@ Destination is configured by `osc_out_host` + `osc_out_port`.
 ## Next Docs
 
 - [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
+- [docs/CC_BUTTONS_AND_AUTO_TRIGGER.md](docs/CC_BUTTONS_AND_AUTO_TRIGGER.md)
 - [SETUP.md](SETUP.md)
 - [docs/WING_OSC_PROTOCOL.md](docs/WING_OSC_PROTOCOL.md)

@@ -2,6 +2,8 @@
 
 This guide explains how to map Behringer WING custom controls to REAPER actions used with AUDIOLAB.wing.reaper.virtualsoundcheck.
 
+Note: in normal operation, manual mapping is not required. The plugin pushes WING button commands automatically when `Assign MIDI shortcuts to REAPER` is enabled.
+
 ## Fixed MIDI Mapping Used by the Plugin
 
 When `Assign MIDI shortcuts to REAPER` is enabled, the plugin listens for these exact MIDI CC messages and triggers these REAPER actions:
@@ -42,7 +44,7 @@ On WING:
 
 By default, AUDIOLAB.wing.reaper.virtualsoundcheck handles these CC mappings internally and also pushes matching MIDI command assignments to WING custom buttons when `Assign MIDI shortcuts to REAPER` is ON.
 
-If you want to map them manually:
+Manual mapping is legacy/fallback only (for troubleshooting environments where automatic assignment cannot be used):
 
 1. Open `Actions -> Show action list`.
 2. Select the corresponding action from the table above.

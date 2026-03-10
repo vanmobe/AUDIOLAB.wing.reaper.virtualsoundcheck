@@ -53,7 +53,8 @@ See [QUICKSTART.md](QUICKSTART.md) for the 5-minute flow.
 - [INSTALL.md](INSTALL.md) - installer-first setup by platform
 - [QUICKSTART.md](QUICKSTART.md) - operator flow
 - [docs/USER_GUIDE.md](docs/USER_GUIDE.md) - practical usage walkthrough
-- [snapshots/README.md](snapshots/README.md) - optional MIDI button mapping guide
+- [docs/CC_BUTTONS_AND_AUTO_TRIGGER.md](docs/CC_BUTTONS_AND_AUTO_TRIGGER.md) - CC mapping and auto-trigger behavior
+- [snapshots/README.md](snapshots/README.md) - legacy/manual MIDI mapping fallback
 
 ## Developer Documentation
 

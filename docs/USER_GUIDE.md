@@ -58,7 +58,7 @@ From the same dialog flow you can:
 4. When needed, configure virtual soundcheck and toggle mode.
 5. Refresh tracks if channel metadata changes on WING.
 
-## 6. MIDI Button Control (Optional)
+## 6. MIDI Button Control (Automatic)
 
 Built-in CC mapping used by AUDIOLAB.wing.reaper.virtualsoundcheck:
 
@@ -78,12 +78,32 @@ Requirements:
 - MIDI channel must be channel 1
 - Button press value must be `> 0`
 - Enable `Assign MIDI shortcuts to REAPER` in the plugin window to push command bindings and labels to the selected WING layer automatically
+- No manual action-list mapping is required for normal operation
 
-For full setup steps on WING and REAPER, see:
+Detailed behavior and fallback notes:
 
+- [CC_BUTTONS_AND_AUTO_TRIGGER.md](CC_BUTTONS_AND_AUTO_TRIGGER.md)
 - [snapshots/README.md](../snapshots/README.md)
 
-## 7. Troubleshooting
+## 7. Auto-Trigger (Optional)
+
+Auto-trigger is configured in the `Auto Trigger` section of the plugin window and can run in:
+
+- `WARNING` mode: warning state only, no transport record start
+- `RECORD` mode: automatic REAPER record start/stop based on signal
+
+Main controls:
+
+- `Monitor track`
+- `Threshold` (dBFS)
+- `Hold ms`
+- `CC layer` for warning/record status display on WING
+
+Detailed reference:
+
+- [CC_BUTTONS_AND_AUTO_TRIGGER.md](CC_BUTTONS_AND_AUTO_TRIGGER.md)
+
+## 8. Troubleshooting
 
 - No connection:
   - WING and computer must be on same network
@@ -102,3 +122,4 @@ For full setup steps on WING and REAPER, see:
 - [QUICKSTART.md](../QUICKSTART.md)
 - [SETUP.md](../SETUP.md)
 - [docs/ARCHITECTURE.md](ARCHITECTURE.md)
+- [CC_BUTTONS_AND_AUTO_TRIGGER.md](CC_BUTTONS_AND_AUTO_TRIGGER.md)
